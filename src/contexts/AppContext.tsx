@@ -113,9 +113,21 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const [repCredentials, setRepCredentialsState] = useState<RepCredential[]>(() => {
     const stored = getRepCredentials()
-    if (stored.length > 0) return stored
-    saveRepCredentials(DEFAULT_REP_CREDENTIALS)
-    return DEFAULT_REP_CREDENTIALS
+    if (stored.length === 0) {
+      saveRepCredentials(DEFAULT_REP_CREDENTIALS)
+      return DEFAULT_REP_CREDENTIALS
+    }
+    // Merge: add any new default accounts not yet in localStorage
+    const storedEmails = new Set(stored.map((c) => c.email.toLowerCase()))
+    const missing = DEFAULT_REP_CREDENTIALS.filter(
+      (c) => !storedEmails.has(c.email.toLowerCase())
+    )
+    if (missing.length > 0) {
+      const merged = [...stored, ...missing]
+      saveRepCredentials(merged)
+      return merged
+    }
+    return stored
   })
 
   const [currentView, setCurrentView] = useState<View>('map')

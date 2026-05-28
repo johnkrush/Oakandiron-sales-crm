@@ -4,12 +4,13 @@ import { MapPin, Eye, EyeOff, AlertCircle, ChevronDown } from 'lucide-react'
 
 const DEMO_ACCOUNTS = [
   { label: 'Admin', email: 'admin@canvass.app', password: 'admin123', role: 'Team Lead' },
+  { label: 'Chris', email: 'chris@canvass.app', password: 'canvass123', role: 'Sales Rep' },
+  { label: 'Emma', email: 'emma@canvass.app', password: 'canvass123', role: 'Sales Rep' },
   { label: 'Sarah', email: 'sarah@canvass.app', password: 'canvass123', role: 'Sales Rep' },
   { label: 'Mike', email: 'mike@canvass.app', password: 'canvass123', role: 'Sales Rep' },
   { label: 'Lisa', email: 'lisa@canvass.app', password: 'canvass123', role: 'Sales Rep' },
   { label: 'David', email: 'david@canvass.app', password: 'canvass123', role: 'Sales Rep' },
   { label: 'Tom', email: 'tom@canvass.app', password: 'canvass123', role: 'Sales Rep' },
-  { label: 'Emma', email: 'emma@canvass.app', password: 'canvass123', role: 'Sales Rep' },
 ]
 
 export default function LoginScreen() {

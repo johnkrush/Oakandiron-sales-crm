@@ -99,6 +99,7 @@ export const ALL_STATUSES: LeadStatus[] = [
 ]
 
 export const TEAM_MEMBERS = [
+  'Chris',
   'Sarah Chen',
   'Mike Rodriguez',
   'Lisa Thompson',
@@ -108,6 +109,7 @@ export const TEAM_MEMBERS = [
 ]
 
 export const DEFAULT_REP_CREDENTIALS: RepCredential[] = [
+  { id: 'rep-0', email: 'chris@canvass.app', password: 'canvass123', name: 'Chris' },
   { id: 'rep-1', email: 'sarah@canvass.app', password: 'canvass123', name: 'Sarah Chen' },
   { id: 'rep-2', email: 'mike@canvass.app', password: 'canvass123', name: 'Mike Rodriguez' },
   { id: 'rep-3', email: 'lisa@canvass.app', password: 'canvass123', name: 'Lisa Thompson' },
