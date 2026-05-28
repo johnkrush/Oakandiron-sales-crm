@@ -8,7 +8,10 @@ import Dashboard from '../dashboard/Dashboard'
 import SettingsPage from '../settings/Settings'
 
 export default function Layout() {
-  const { currentView } = useApp()
+  const { currentView, isAdmin } = useApp()
+
+  // Guard: reps cannot access settings
+  const safeView = !isAdmin && currentView === 'settings' ? 'map' : currentView
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
@@ -18,27 +21,27 @@ export default function Layout() {
         <Sidebar />
 
         <main className="flex-1 overflow-hidden flex flex-col">
-          {/* Map always mounted, show/hide via CSS to preserve Leaflet state */}
+          {/* Map always mounted — preserves Leaflet state across view switches */}
           <div
             className="flex-1 overflow-hidden"
-            style={{ display: currentView === 'map' ? 'flex' : 'none' }}
+            style={{ display: safeView === 'map' ? 'flex' : 'none' }}
           >
             <MapView />
           </div>
 
-          {currentView === 'list' && (
+          {safeView === 'list' && (
             <div className="flex-1 overflow-hidden flex flex-col">
               <LeadList />
             </div>
           )}
 
-          {currentView === 'dashboard' && (
+          {safeView === 'dashboard' && (
             <div className="flex-1 overflow-y-auto p-4 md:p-6">
               <Dashboard />
             </div>
           )}
 
-          {currentView === 'settings' && (
+          {safeView === 'settings' && isAdmin && (
             <div className="flex-1 overflow-y-auto p-4 md:p-6">
               <SettingsPage />
             </div>

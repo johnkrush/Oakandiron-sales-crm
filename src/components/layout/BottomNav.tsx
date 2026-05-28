@@ -6,21 +6,24 @@ interface NavItem {
   view: View
   label: string
   icon: React.ElementType
+  adminOnly?: boolean
 }
 
 const NAV: NavItem[] = [
   { view: 'map', label: 'Map', icon: MapPin },
   { view: 'list', label: 'Leads', icon: List },
   { view: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { view: 'settings', label: 'Settings', icon: Settings },
+  { view: 'settings', label: 'Settings', icon: Settings, adminOnly: true },
 ]
 
 export default function BottomNav() {
-  const { currentView, setCurrentView } = useApp()
+  const { currentView, setCurrentView, isAdmin } = useApp()
+
+  const visibleNav = NAV.filter((item) => !item.adminOnly || isAdmin)
 
   return (
     <nav
-      className="md:hidden flex items-center justify-around shrink-0 z-30 safe-area-bottom"
+      className="md:hidden flex items-center shrink-0 z-30"
       style={{
         height: '64px',
         background: 'rgba(8,11,18,0.92)',
@@ -28,7 +31,7 @@ export default function BottomNav() {
         borderTop: '1px solid rgba(255,255,255,0.08)',
       }}
     >
-      {NAV.map(({ view, label, icon: Icon }) => {
+      {visibleNav.map(({ view, label, icon: Icon }) => {
         const active = currentView === view
         return (
           <button

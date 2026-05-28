@@ -1,4 +1,4 @@
-import { Lead, User, MapPosition } from '../types'
+import { Lead, User, MapPosition, RepCredential } from '../types'
 
 const KEYS = {
   leads: 'canvass_leads',
@@ -6,6 +6,7 @@ const KEYS = {
   mapPosition: 'canvass_map_position',
   initialized: 'canvass_initialized',
   teamMembers: 'canvass_team_members',
+  repCredentials: 'canvass_rep_credentials',
 } as const
 
 export function getLeads(): Lead[] {
@@ -63,6 +64,19 @@ export function isInitialized(): boolean {
 
 export function setInitialized(): void {
   localStorage.setItem(KEYS.initialized, 'true')
+}
+
+export function getRepCredentials(): RepCredential[] {
+  try {
+    const raw = localStorage.getItem(KEYS.repCredentials)
+    return raw ? (JSON.parse(raw) as RepCredential[]) : []
+  } catch {
+    return []
+  }
+}
+
+export function saveRepCredentials(creds: RepCredential[]): void {
+  localStorage.setItem(KEYS.repCredentials, JSON.stringify(creds))
 }
 
 export function getTeamMembers(): string[] {

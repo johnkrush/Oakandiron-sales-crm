@@ -13,7 +13,9 @@ import {
   View,
   MapPosition,
   LeadStatus,
+  RepCredential,
   TEAM_MEMBERS as DEFAULT_TEAM_MEMBERS,
+  DEFAULT_REP_CREDENTIALS,
 } from '../types'
 import {
   getLeads,
@@ -27,6 +29,8 @@ import {
   clearAllData,
   getTeamMembers,
   saveTeamMembers,
+  getRepCredentials,
+  saveRepCredentials,
 } from '../utils/storage'
 import { DEMO_LEADS } from '../data/demoData'
 
@@ -40,14 +44,17 @@ interface FlyToTarget {
 interface AppContextValue {
   // Auth
   user: User | null
+  isAdmin: boolean
   login: (email: string, password: string) => boolean
   logout: () => void
+  updateUser: (updates: Partial<User>) => void
 
   // Leads
   leads: Lead[]
   addLead: (lead: Omit<Lead, 'id' | 'createdAt' | 'updatedAt'>) => Lead
   updateLead: (lead: Lead) => void
   deleteLead: (id: string) => void
+  canEditLead: (lead: Lead) => boolean
 
   // Navigation
   currentView: View
@@ -69,19 +76,32 @@ interface AppContextValue {
   selectedLeadId: string | null
   selectLead: (id: string | null) => void
 
-  // Team members
+  // Team
   teamMembers: string[]
   setTeamMembers: (members: string[]) => void
 
+  // Rep credentials (admin only)
+  repCredentials: RepCredential[]
+  addRepCredential: (cred: Omit<RepCredential, 'id'>) => void
+  updateRepCredential: (id: string, updates: Partial<RepCredential>) => void
+  deleteRepCredential: (id: string) => void
+
   // Settings
-  updateUser: (updates: Partial<User>) => void
   clearData: () => void
 }
 
 const AppContext = createContext<AppContextValue | null>(null)
 
 export function AppProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(() => getUser())
+  const [user, setUser] = useState<User | null>(() => {
+    const u = getUser()
+    // Migrate old "Team Lead" role string to 'admin'
+    if (u && (u.role as string) === 'Team Lead') {
+      return { ...u, role: 'admin' }
+    }
+    return u
+  })
+
   const [leads, setLeads] = useState<Lead[]>(() => {
     if (!isInitialized()) {
       saveLeads(DEMO_LEADS)
@@ -90,11 +110,20 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
     return getLeads()
   })
+
+  const [repCredentials, setRepCredentialsState] = useState<RepCredential[]>(() => {
+    const stored = getRepCredentials()
+    if (stored.length > 0) return stored
+    saveRepCredentials(DEFAULT_REP_CREDENTIALS)
+    return DEFAULT_REP_CREDENTIALS
+  })
+
   const [currentView, setCurrentView] = useState<View>('map')
   const [mapPosition, setMapPositionState] = useState<MapPosition>(() => getMapPosition())
   const [flyToTarget, setFlyToTarget] = useState<FlyToTarget | null>(null)
   const [activeFilters, setActiveFilters] = useState<LeadStatus[]>([])
   const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null)
+
   const [teamMembers, setTeamMembersState] = useState<string[]>(() => {
     const stored = getTeamMembers()
     return stored.length > 0 ? stored : DEFAULT_TEAM_MEMBERS
@@ -104,19 +133,39 @@ export function AppProvider({ children }: { children: ReactNode }) {
     saveLeads(leads)
   }, [leads])
 
-  const login = useCallback((email: string, password: string): boolean => {
-    if (email === 'admin@canvass.app' && password === 'admin123') {
-      const u: User = { email, name: 'Admin User', role: 'Team Lead' }
-      setUser(u)
-      saveUser(u)
-      return true
-    }
-    return false
-  }, [])
+  const isAdmin = user?.role === 'admin'
+
+  const login = useCallback(
+    (email: string, password: string): boolean => {
+      const trimEmail = email.trim().toLowerCase()
+      // Admin account
+      if (trimEmail === 'admin@canvass.app' && password === 'admin123') {
+        const u: User = { email: trimEmail, name: 'Admin User', role: 'admin' }
+        setUser(u)
+        saveUser(u)
+        return true
+      }
+      // Rep accounts (read fresh from state so changes are reflected)
+      const match = repCredentials.find(
+        (c) => c.email.toLowerCase() === trimEmail && c.password === password
+      )
+      if (match) {
+        const u: User = { email: trimEmail, name: match.name, role: 'rep' }
+        setUser(u)
+        saveUser(u)
+        return true
+      }
+      return false
+    },
+    [repCredentials]
+  )
 
   const logout = useCallback(() => {
     setUser(null)
     saveUser(null)
+    setCurrentView('map')
+    setActiveFilters([])
+    setSelectedLeadId(null)
   }, [])
 
   const updateUser = useCallback((updates: Partial<User>) => {
@@ -128,10 +177,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
     })
   }, [])
 
-  const setTeamMembers = useCallback((members: string[]) => {
-    setTeamMembersState(members)
-    saveTeamMembers(members)
-  }, [])
+  const canEditLead = useCallback(
+    (lead: Lead): boolean => {
+      if (!user) return false
+      if (user.role === 'admin') return true
+      return lead.assignedRep === user.name
+    },
+    [user]
+  )
 
   const addLead = useCallback(
     (data: Omit<Lead, 'id' | 'createdAt' | 'updatedAt'>): Lead => {
@@ -165,13 +218,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     saveMapPosition(p)
   }, [])
 
-  const flyTo = useCallback((target: FlyToTarget) => {
-    setFlyToTarget(target)
-  }, [])
-
-  const clearFlyTo = useCallback(() => {
-    setFlyToTarget(null)
-  }, [])
+  const flyTo = useCallback((target: FlyToTarget) => setFlyToTarget(target), [])
+  const clearFlyTo = useCallback(() => setFlyToTarget(null), [])
 
   const toggleFilter = useCallback((s: LeadStatus) => {
     setActiveFilters((prev) =>
@@ -180,9 +228,43 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const clearFilters = useCallback(() => setActiveFilters([]), [])
+  const selectLead = useCallback((id: string | null) => setSelectedLeadId(id), [])
 
-  const selectLead = useCallback((id: string | null) => {
-    setSelectedLeadId(id)
+  const setTeamMembers = useCallback((members: string[]) => {
+    setTeamMembersState(members)
+    saveTeamMembers(members)
+  }, [])
+
+  // ── Rep credential management (admin only) ───────────────────
+  const addRepCredential = useCallback((cred: Omit<RepCredential, 'id'>) => {
+    const newCred: RepCredential = {
+      ...cred,
+      id: `rep-${Date.now()}`,
+    }
+    setRepCredentialsState((prev) => {
+      const updated = [...prev, newCred]
+      saveRepCredentials(updated)
+      return updated
+    })
+  }, [])
+
+  const updateRepCredential = useCallback(
+    (id: string, updates: Partial<RepCredential>) => {
+      setRepCredentialsState((prev) => {
+        const updated = prev.map((c) => (c.id === id ? { ...c, ...updates } : c))
+        saveRepCredentials(updated)
+        return updated
+      })
+    },
+    []
+  )
+
+  const deleteRepCredential = useCallback((id: string) => {
+    setRepCredentialsState((prev) => {
+      const updated = prev.filter((c) => c.id !== id)
+      saveRepCredentials(updated)
+      return updated
+    })
   }, [])
 
   const clearData = useCallback(() => {
@@ -191,6 +273,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setInitialized()
     setLeads(DEMO_LEADS)
     setTeamMembersState(DEFAULT_TEAM_MEMBERS)
+    saveRepCredentials(DEFAULT_REP_CREDENTIALS)
+    setRepCredentialsState(DEFAULT_REP_CREDENTIALS)
     setActiveFilters([])
     setSelectedLeadId(null)
   }, [])
@@ -198,6 +282,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const value = useMemo<AppContextValue>(
     () => ({
       user,
+      isAdmin,
       login,
       logout,
       updateUser,
@@ -205,6 +290,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       addLead,
       updateLead,
       deleteLead,
+      canEditLead,
       currentView,
       setCurrentView,
       mapPosition,
@@ -219,10 +305,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
       selectLead,
       teamMembers,
       setTeamMembers,
+      repCredentials,
+      addRepCredential,
+      updateRepCredential,
+      deleteRepCredential,
       clearData,
     }),
     [
       user,
+      isAdmin,
       login,
       logout,
       updateUser,
@@ -230,6 +321,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       addLead,
       updateLead,
       deleteLead,
+      canEditLead,
       currentView,
       mapPosition,
       setMapPosition,
@@ -243,6 +335,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
       selectLead,
       teamMembers,
       setTeamMembers,
+      repCredentials,
+      addRepCredential,
+      updateRepCredential,
+      deleteRepCredential,
       clearData,
     ]
   )

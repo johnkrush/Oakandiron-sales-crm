@@ -79,6 +79,9 @@ function MapEvents({ onMapClick, onBoundsChange, onPositionChange }: MapEventsPr
 export default function MapView() {
   const {
     leads,
+    user,
+    isAdmin,
+    canEditLead,
     mapPosition,
     setMapPosition,
     flyToTarget,
@@ -93,17 +96,18 @@ export default function MapView() {
   const [pendingPin, setPendingPin] = useState<{ lat: number; lng: number } | null>(null)
   const [editLead, setEditLead] = useState<Lead | null>(null)
   const [showForm, setShowForm] = useState(false)
+  const [lockedLead, setLockedLead] = useState<Lead | null>(null)
 
   // Jump to selected lead from list view
   useEffect(() => {
     if (!selectedLeadId) return
     const lead = leads.find((l) => l.id === selectedLeadId)
-    if (lead) {
+    if (lead && canEditLead(lead)) {
       setEditLead(lead)
       setShowForm(true)
     }
     selectLead(null)
-  }, [selectedLeadId, leads, selectLead])
+  }, [selectedLeadId, leads, selectLead, canEditLead])
 
   // Also open form if flyToTarget has a leadId
   useEffect(() => {
@@ -125,10 +129,16 @@ export default function MapView() {
   }, [showForm])
 
   const handleMarkerClick = useCallback((lead: Lead) => {
+    if (!canEditLead(lead)) {
+      // Show brief locked notice for rep clicking another rep's pin
+      setLockedLead(lead)
+      setTimeout(() => setLockedLead(null), 2200)
+      return
+    }
     setPendingPin(null)
     setEditLead(lead)
     setShowForm(true)
-  }, [])
+  }, [canEditLead])
 
   const handleClose = useCallback(() => {
     setShowForm(false)
@@ -182,17 +192,20 @@ export default function MapView() {
           onPositionChange={handlePositionChange}
         />
 
-        {visibleLeads.map((lead) => (
-          <Marker
-            key={lead.id}
-            position={[lead.lat, lead.lng]}
-            icon={createTeardropIcon(
-              STATUS_CONFIG[lead.status].color,
-              editLead?.id === lead.id
-            )}
-            eventHandlers={{ click: () => handleMarkerClick(lead) }}
-          />
-        ))}
+        {visibleLeads.map((lead) => {
+          const editable = canEditLead(lead)
+          return (
+            <Marker
+              key={lead.id}
+              position={[lead.lat, lead.lng]}
+              icon={createTeardropIcon(
+                editable ? STATUS_CONFIG[lead.status].color : STATUS_CONFIG[lead.status].color + '88',
+                editLead?.id === lead.id
+              )}
+              eventHandlers={{ click: () => handleMarkerClick(lead) }}
+            />
+          )
+        })}
       </MapContainer>
 
       {/* ── Top overlays ── */}
@@ -245,6 +258,43 @@ export default function MapView() {
           <Locate size={18} className="text-white/70" />
         </button>
       </div>
+
+      {/* ── Locked lead notice (rep clicked another rep's pin) ── */}
+      {lockedLead && !isAdmin && (
+        <div
+          className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[1200]
+            flex items-center gap-2.5 px-4 py-3 rounded-xl text-sm font-medium animate-fade-in pointer-events-none"
+          style={{
+            background: 'rgba(8,11,24,0.95)',
+            backdropFilter: 'blur(20px)',
+            border: '1px solid rgba(255,255,255,0.12)',
+            color: 'rgba(240,244,255,0.7)',
+            boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
+          }}
+        >
+          <span className="text-base">🔒</span>
+          <span>
+            Assigned to <strong className="text-white">{lockedLead.assignedRep || 'another rep'}</strong>
+          </span>
+        </div>
+      )}
+
+      {/* ── Rep indicator badge ── */}
+      {!isAdmin && user && (
+        <div
+          className="absolute top-3 left-3 z-[1000] flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-medium"
+          style={{
+            background: 'rgba(8,18,36,0.88)',
+            backdropFilter: 'blur(16px)',
+            border: '1px solid rgba(29,158,117,0.3)',
+            color: '#1D9E75',
+            boxShadow: '0 4px 16px rgba(0,0,0,0.3)',
+          }}
+        >
+          <span className="w-1.5 h-1.5 rounded-full bg-[#1D9E75] animate-pulse" />
+          {user.name} — your leads only
+        </div>
+      )}
 
       {/* ── Pin form modal ── */}
       {showForm && (

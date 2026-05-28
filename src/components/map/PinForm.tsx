@@ -22,7 +22,7 @@ const BASE_EMPTY = {
 }
 
 export default function PinForm({ pendingPin, existingLead, onClose }: Props) {
-  const { addLead, updateLead, deleteLead, teamMembers } = useApp()
+  const { addLead, updateLead, deleteLead, teamMembers, user, isAdmin } = useApp()
   const [form, setForm] = useState<typeof BASE_EMPTY>({ ...BASE_EMPTY })
   const [geocoding, setGeocoding] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
@@ -42,9 +42,11 @@ export default function PinForm({ pendingPin, existingLead, onClose }: Props) {
         assignedRep: existingLead.assignedRep,
       })
     } else {
-      setForm({ ...BASE_EMPTY, assignedRep: teamMembers[0] ?? '' })
+      // Reps always get self-assigned; admin defaults to first team member
+      const defaultRep = !isAdmin && user ? user.name : (teamMembers[0] ?? '')
+      setForm({ ...BASE_EMPTY, assignedRep: defaultRep })
     }
-  }, [existingLead])
+  }, [existingLead, isAdmin, user, teamMembers])
 
   // Reverse geocode when a new pin is dropped
   useEffect(() => {
@@ -236,16 +238,26 @@ export default function PinForm({ pendingPin, existingLead, onClose }: Props) {
 
             <div>
               <label className="field-label">Assigned Rep</label>
-              <select
-                value={form.assignedRep}
-                onChange={(e) => set('assignedRep', e.target.value)}
-                className="field-input"
-                style={{ appearance: 'none' }}
-              >
-                {teamMembers.map((m) => (
-                  <option key={m} value={m} style={{ background: '#0d1426' }}>{m}</option>
-                ))}
-              </select>
+              {isAdmin ? (
+                <select
+                  value={form.assignedRep}
+                  onChange={(e) => set('assignedRep', e.target.value)}
+                  className="field-input"
+                  style={{ appearance: 'none' }}
+                >
+                  {teamMembers.map((m) => (
+                    <option key={m} value={m} style={{ background: '#0d1426' }}>{m}</option>
+                  ))}
+                </select>
+              ) : (
+                <div
+                  className="field-input flex items-center gap-2 opacity-60 cursor-not-allowed select-none"
+                >
+                  <span className="w-2 h-2 rounded-full bg-[#1D9E75]" />
+                  {form.assignedRep}
+                  <span className="ml-auto text-[10px] text-white/30">auto-assigned</span>
+                </div>
+              )}
             </div>
 
             <div>

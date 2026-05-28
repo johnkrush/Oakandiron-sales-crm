@@ -5,6 +5,8 @@ export type LeadStatus =
   | 'not-interested'
   | 'do-not-knock'
 
+export type UserRole = 'admin' | 'rep'
+
 export interface Lead {
   id: string
   householdName: string
@@ -24,7 +26,14 @@ export interface Lead {
 export interface User {
   email: string
   name: string
-  role: string
+  role: UserRole
+}
+
+export interface RepCredential {
+  id: string
+  email: string
+  password: string
+  name: string  // must match a team member name so lead.assignedRep links up
 }
 
 export type View = 'map' | 'list' | 'dashboard' | 'settings'
@@ -98,8 +107,11 @@ export const TEAM_MEMBERS = [
   'Emma Davis',
 ]
 
-export const DEMO_USER: User = {
-  email: 'admin@canvass.app',
-  name: 'Admin User',
-  role: 'Team Lead',
-}
+export const DEFAULT_REP_CREDENTIALS: RepCredential[] = [
+  { id: 'rep-1', email: 'sarah@canvass.app', password: 'canvass123', name: 'Sarah Chen' },
+  { id: 'rep-2', email: 'mike@canvass.app', password: 'canvass123', name: 'Mike Rodriguez' },
+  { id: 'rep-3', email: 'lisa@canvass.app', password: 'canvass123', name: 'Lisa Thompson' },
+  { id: 'rep-4', email: 'david@canvass.app', password: 'canvass123', name: 'David Park' },
+  { id: 'rep-5', email: 'tom@canvass.app', password: 'canvass123', name: 'Tom Wilson' },
+  { id: 'rep-6', email: 'emma@canvass.app', password: 'canvass123', name: 'Emma Davis' },
+]

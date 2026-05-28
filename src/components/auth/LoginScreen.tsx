@@ -1,6 +1,16 @@
 import { useState, type FormEvent } from 'react'
 import { useApp } from '../../contexts/AppContext'
-import { MapPin, Eye, EyeOff, AlertCircle } from 'lucide-react'
+import { MapPin, Eye, EyeOff, AlertCircle, ChevronDown } from 'lucide-react'
+
+const DEMO_ACCOUNTS = [
+  { label: 'Admin', email: 'admin@canvass.app', password: 'admin123', role: 'Team Lead' },
+  { label: 'Sarah', email: 'sarah@canvass.app', password: 'canvass123', role: 'Sales Rep' },
+  { label: 'Mike', email: 'mike@canvass.app', password: 'canvass123', role: 'Sales Rep' },
+  { label: 'Lisa', email: 'lisa@canvass.app', password: 'canvass123', role: 'Sales Rep' },
+  { label: 'David', email: 'david@canvass.app', password: 'canvass123', role: 'Sales Rep' },
+  { label: 'Tom', email: 'tom@canvass.app', password: 'canvass123', role: 'Sales Rep' },
+  { label: 'Emma', email: 'emma@canvass.app', password: 'canvass123', role: 'Sales Rep' },
+]
 
 export default function LoginScreen() {
   const { login } = useApp()
@@ -9,21 +19,27 @@ export default function LoginScreen() {
   const [showPw, setShowPw] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [showAccounts, setShowAccounts] = useState(false)
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
     setError('')
     setLoading(true)
-    // Brief delay for UX feel
-    await new Promise((r) => setTimeout(r, 600))
+    await new Promise((r) => setTimeout(r, 500))
     const ok = login(email.trim(), password)
-    if (!ok) setError('Invalid email or password. Try admin@canvass.app / admin123')
+    if (!ok) setError('Invalid email or password.')
     setLoading(false)
+  }
+
+  const fillAccount = (acc: (typeof DEMO_ACCOUNTS)[number]) => {
+    setEmail(acc.email)
+    setPassword(acc.password)
+    setError('')
+    setShowAccounts(false)
   }
 
   return (
     <div className="relative w-full h-full flex items-center justify-center px-4 overflow-hidden bg-[#080b12]">
-      {/* Orbs */}
       <div className="orb orb-1" />
       <div className="orb orb-2" />
       <div className="orb orb-3" />
@@ -43,7 +59,7 @@ export default function LoginScreen() {
 
         {/* Card */}
         <div className="glass rounded-2xl p-7 shadow-2xl">
-          <h2 className="text-lg font-semibold text-white mb-6">Sign in to your team</h2>
+          <h2 className="text-lg font-semibold text-white mb-5">Sign in to your team</h2>
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
@@ -52,7 +68,7 @@ export default function LoginScreen() {
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="admin@canvass.app"
+                placeholder="you@canvass.app"
                 required
                 autoComplete="email"
                 className="field-input"
@@ -83,8 +99,10 @@ export default function LoginScreen() {
             </div>
 
             {error && (
-              <div className="flex items-start gap-2 px-3 py-2.5 rounded-lg text-xs"
-                style={{ background: 'rgba(226,75,74,0.12)', border: '1px solid rgba(226,75,74,0.3)', color: '#E24B4A' }}>
+              <div
+                className="flex items-start gap-2 px-3 py-2.5 rounded-lg text-xs"
+                style={{ background: 'rgba(226,75,74,0.12)', border: '1px solid rgba(226,75,74,0.3)', color: '#E24B4A' }}
+              >
                 <AlertCircle size={14} className="mt-0.5 shrink-0" />
                 <span>{error}</span>
               </div>
@@ -93,13 +111,13 @@ export default function LoginScreen() {
             <button
               type="submit"
               disabled={loading}
-              className="btn-primary w-full mt-2 h-11 disabled:opacity-60 disabled:cursor-not-allowed"
+              className="btn-primary w-full h-11 disabled:opacity-60 disabled:cursor-not-allowed"
             >
               {loading ? (
                 <span className="flex items-center gap-2">
                   <svg className="animate-spin w-4 h-4" viewBox="0 0 24 24" fill="none">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                   </svg>
                   Signing in…
                 </span>
@@ -109,11 +127,43 @@ export default function LoginScreen() {
             </button>
           </form>
 
-          <p className="mt-5 text-center text-xs text-dim">
-            Demo: <span className="text-white/50">admin@canvass.app</span>{' '}
-            /{' '}
-            <span className="text-white/50">admin123</span>
-          </p>
+          {/* Demo account picker */}
+          <div className="mt-5 pt-4" style={{ borderTop: '1px solid rgba(255,255,255,0.07)' }}>
+            <button
+              type="button"
+              onClick={() => setShowAccounts((v) => !v)}
+              className="w-full flex items-center justify-between text-xs text-dim hover:text-white/60 transition-colors"
+            >
+              <span>Demo accounts — click to fill</span>
+              <ChevronDown
+                size={13}
+                className="transition-transform"
+                style={{ transform: showAccounts ? 'rotate(180deg)' : 'none' }}
+              />
+            </button>
+
+            {showAccounts && (
+              <div className="mt-2.5 grid grid-cols-2 gap-1.5 animate-slide-up">
+                {DEMO_ACCOUNTS.map((acc) => (
+                  <button
+                    key={acc.email}
+                    type="button"
+                    onClick={() => fillAccount(acc)}
+                    className="text-left px-3 py-2 rounded-xl transition-all"
+                    style={{
+                      background: 'rgba(255,255,255,0.04)',
+                      border: '1px solid rgba(255,255,255,0.08)',
+                    }}
+                    onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(99,102,241,0.1)'; e.currentTarget.style.borderColor = 'rgba(99,102,241,0.35)' }}
+                    onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.04)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)' }}
+                  >
+                    <p className="text-xs font-semibold text-white">{acc.label}</p>
+                    <p className="text-[10px] text-dim mt-0.5">{acc.role}</p>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
 
         <p className="text-center text-xs text-dim mt-6">
