@@ -10,34 +10,23 @@ import AreaSummary from './AreaSummary'
 import PinForm from './PinForm'
 import { Locate, Plus, Layers } from 'lucide-react'
 
-// ── Tile layer configs ────────────────────────────────────────────
-// OSM standard tiles show house numbers on buildings at zoom 18-19
-const OSM_URL = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png'
-const OSM_ATTRIBUTION = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-const ESRI_SAT_URL = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'
-const ESRI_ATTRIBUTION = '&copy; Esri, Maxar, Earthstar Geographics, and the GIS User Community'
+// ── Mapbox tile configs ───────────────────────────────────────────
+const MB_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN as string
+const MB_ATTR = '&copy; <a href="https://www.mapbox.com/about/maps/">Mapbox</a> &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
 
-const TILES: Record<MapStyle, { url: string; attribution: string; maxNativeZoom: number; subdomains: string }> = {
-  // Street: standard OSM — shows house numbers at zoom 18+
+const TILES: Record<MapStyle, { url: string; attribution: string }> = {
   street: {
-    url: OSM_URL,
-    attribution: OSM_ATTRIBUTION,
-    maxNativeZoom: 19,
-    subdomains: 'abc',
+    url: `https://api.mapbox.com/styles/v1/mapbox/streets-v12/tiles/{z}/{x}/{y}?access_token=${MB_TOKEN}`,
+    attribution: MB_ATTR,
   },
-  // Satellite: ESRI imagery only
   satellite: {
-    url: ESRI_SAT_URL,
-    attribution: ESRI_ATTRIBUTION,
-    maxNativeZoom: 19,
-    subdomains: '',
+    url: `https://api.mapbox.com/styles/v1/mapbox/satellite-v9/tiles/{z}/{x}/{y}?access_token=${MB_TOKEN}`,
+    attribution: MB_ATTR,
   },
-  // Hybrid: ESRI satellite base (OSM overlay added separately below)
+  // satellite-streets already includes road labels + house numbers over imagery
   hybrid: {
-    url: ESRI_SAT_URL,
-    attribution: `${ESRI_ATTRIBUTION} | ${OSM_ATTRIBUTION}`,
-    maxNativeZoom: 19,
-    subdomains: '',
+    url: `https://api.mapbox.com/styles/v1/mapbox/satellite-streets-v12/tiles/{z}/{x}/{y}?access_token=${MB_TOKEN}`,
+    attribution: MB_ATTR,
   },
 }
 
@@ -259,7 +248,6 @@ export default function MapView() {
   }, [setMapPosition])
 
   const tileConfig = TILES[mapStyle]
-
   return (
     <div className="relative w-full flex-1 overflow-hidden">
       <MapContainer
@@ -271,29 +259,16 @@ export default function MapView() {
         zoomControl={true}
         attributionControl={true}
       >
-        {/* ── Base tile layer ── key forces re-mount on style change */}
+        {/* ── Mapbox tile layer — key forces re-mount on style change ── */}
         <TileLayer
-          key={`base-${mapStyle}`}
+          key={`mapbox-${mapStyle}`}
           url={tileConfig.url}
           attribution={tileConfig.attribution}
+          tileSize={512}
+          zoomOffset={-1}
           maxZoom={22}
-          maxNativeZoom={tileConfig.maxNativeZoom}
-          subdomains={tileConfig.subdomains || 'abc'}
+          maxNativeZoom={22}
         />
-
-        {/* ── Hybrid: OSM labels on top of satellite at 0.7 opacity ──
-            OSM shows house numbers on buildings at zoom 18-19         */}
-        {mapStyle === 'hybrid' && (
-          <TileLayer
-            key="hybrid-osm-labels"
-            url={OSM_URL}
-            attribution=""
-            maxZoom={22}
-            maxNativeZoom={19}
-            subdomains="abc"
-            opacity={0.7}
-          />
-        )}
 
         <MapController flyToTarget={flyToTarget} onDone={clearFlyTo} />
         <MapEvents
