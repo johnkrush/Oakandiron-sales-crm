@@ -3,7 +3,7 @@ import { useApp } from '../../contexts/AppContext'
 import { MapPin, Eye, EyeOff, AlertCircle, ChevronDown } from 'lucide-react'
 
 const DEMO_ACCOUNTS = [
-  { label: 'Admin', email: 'admin@canvass.app', password: 'admin123', role: 'Team Lead' },
+  { label: 'Admin', email: 'admin@canvass.app', password: 'Oakandiron26', role: 'Team Lead' },
   { label: 'Chris', email: 'chris@canvass.app', password: 'canvass123', role: 'Sales Rep' },
   { label: 'Emma', email: 'emma@canvass.app', password: 'canvass123', role: 'Sales Rep' },
   { label: 'Sarah', email: 'sarah@canvass.app', password: 'canvass123', role: 'Sales Rep' },
@@ -54,7 +54,7 @@ export default function LoginScreen() {
           >
             <MapPin size={26} className="text-white" />
           </div>
-          <h1 className="text-2xl font-bold text-white tracking-tight">Canvass</h1>
+          <h1 className="text-2xl font-bold text-white tracking-tight">OakandIron Sales</h1>
           <p className="text-sm text-dim mt-1">Door-to-door sales team CRM</p>
         </div>
 
@@ -168,7 +168,7 @@ export default function LoginScreen() {
         </div>
 
         <p className="text-center text-xs text-dim mt-6">
-          © 2025 Canvass · All data stored locally
+          © 2025 OakandIron Sales · All data stored locally
         </p>
       </div>
     </div>

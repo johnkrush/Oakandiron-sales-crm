@@ -584,7 +584,7 @@ export default function SettingsPage() {
         </Section>
 
         <div className="text-center text-xs text-dim pb-4">
-          <p>Canvass v1.0.0 · All data stored locally · No cloud sync</p>
+          <p>OakandIron Sales v1.0.0 · All data stored locally · No cloud sync</p>
         </div>
       </div>
     </>

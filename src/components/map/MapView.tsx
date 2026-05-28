@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import { MapContainer, TileLayer, Marker, useMap, useMapEvents } from 'react-leaflet'
 import L, { type LatLngBounds } from 'leaflet'
 import { useApp } from '../../contexts/AppContext'
@@ -29,6 +29,18 @@ function createTeardropIcon(color: string, selected = false) {
   })
 }
 
+// ── Pulsing blue location dot icon ───────────────────────────────
+const LOCATION_ICON = L.divIcon({
+  html: `<div class="location-dot-wrapper">
+    <div class="location-dot-ring"></div>
+    <div class="location-dot-ring-2"></div>
+    <div class="location-dot-core"></div>
+  </div>`,
+  className: '',
+  iconSize: [20, 20],
+  iconAnchor: [10, 10],
+})
+
 // ── Map controller: fly to target programmatically ────────────────
 interface MapControllerProps {
   flyToTarget: { lat: number; lng: number; zoom?: number } | null
@@ -52,26 +64,17 @@ interface MapEventsProps {
 }
 function MapEvents({ onMapClick, onBoundsChange, onPositionChange }: MapEventsProps) {
   const map = useMapEvents({
-    click(e) {
-      onMapClick(e.latlng.lat, e.latlng.lng)
-    },
+    click(e) { onMapClick(e.latlng.lat, e.latlng.lng) },
     moveend() {
-      const c = map.getCenter()
-      const z = map.getZoom()
-      onBoundsChange(map.getBounds())
-      onPositionChange(c.lat, c.lng, z)
+      const c = map.getCenter(); const z = map.getZoom()
+      onBoundsChange(map.getBounds()); onPositionChange(c.lat, c.lng, z)
     },
     zoomend() {
-      const c = map.getCenter()
-      const z = map.getZoom()
-      onBoundsChange(map.getBounds())
-      onPositionChange(c.lat, c.lng, z)
+      const c = map.getCenter(); const z = map.getZoom()
+      onBoundsChange(map.getBounds()); onPositionChange(c.lat, c.lng, z)
     },
   })
-  // Report initial bounds
-  useEffect(() => {
-    onBoundsChange(map.getBounds())
-  }, [map, onBoundsChange])
+  useEffect(() => { onBoundsChange(map.getBounds()) }, [map, onBoundsChange])
   return null
 }
 
@@ -85,6 +88,7 @@ export default function MapView() {
     mapPosition,
     setMapPosition,
     flyToTarget,
+    flyTo,
     clearFlyTo,
     activeFilters,
     selectedLeadId,
@@ -98,18 +102,51 @@ export default function MapView() {
   const [showForm, setShowForm] = useState(false)
   const [lockedLead, setLockedLead] = useState<Lead | null>(null)
 
-  // Jump to selected lead from list view
+  // ── Live location ─────────────────────────────────────────────
+  const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null)
+  const [locationToast, setLocationToast] = useState('')
+  const locationIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const showLocToast = (msg: string) => {
+    setLocationToast(msg)
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current)
+    toastTimerRef.current = setTimeout(() => setLocationToast(''), 3500)
+  }
+
+  useEffect(() => {
+    if (!navigator.geolocation) return
+
+    const fetchLocation = () => {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => setUserLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+        (err) => {
+          if (err.code === err.PERMISSION_DENIED) {
+            showLocToast('Enable location for live tracking')
+            if (locationIntervalRef.current) clearInterval(locationIntervalRef.current)
+          }
+        },
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 5000 }
+      )
+    }
+
+    fetchLocation()
+    locationIntervalRef.current = setInterval(fetchLocation, 10000)
+
+    return () => {
+      if (locationIntervalRef.current) clearInterval(locationIntervalRef.current)
+      if (toastTimerRef.current) clearTimeout(toastTimerRef.current)
+    }
+  }, [])
+
+  // ── List → map jump ───────────────────────────────────────────
   useEffect(() => {
     if (!selectedLeadId) return
     const lead = leads.find((l) => l.id === selectedLeadId)
-    if (lead && canEditLead(lead)) {
-      setEditLead(lead)
-      setShowForm(true)
-    }
+    if (lead && canEditLead(lead)) { setEditLead(lead); setShowForm(true) }
     selectLead(null)
   }, [selectedLeadId, leads, selectLead, canEditLead])
 
-  // Also open form if flyToTarget has a leadId
   useEffect(() => {
     if (flyToTarget && flyToTarget.leadId) {
       const lead = leads.find((l) => l.id === flyToTarget.leadId)
@@ -123,47 +160,40 @@ export default function MapView() {
 
   const handleMapClick = useCallback((lat: number, lng: number) => {
     if (showForm) return
-    setPendingPin({ lat, lng })
-    setEditLead(null)
-    setShowForm(true)
+    setPendingPin({ lat, lng }); setEditLead(null); setShowForm(true)
   }, [showForm])
 
   const handleMarkerClick = useCallback((lead: Lead) => {
     if (!canEditLead(lead)) {
-      // Show brief locked notice for rep clicking another rep's pin
       setLockedLead(lead)
       setTimeout(() => setLockedLead(null), 2200)
       return
     }
-    setPendingPin(null)
-    setEditLead(lead)
-    setShowForm(true)
+    setPendingPin(null); setEditLead(lead); setShowForm(true)
   }, [canEditLead])
 
   const handleClose = useCallback(() => {
-    setShowForm(false)
-    setPendingPin(null)
-    setEditLead(null)
+    setShowForm(false); setPendingPin(null); setEditLead(null)
   }, [])
 
-  const handleBoundsChange = useCallback((b: LatLngBounds) => {
-    setBounds(b)
-  }, [])
+  const handleBoundsChange = useCallback((b: LatLngBounds) => setBounds(b), [])
 
   const handlePositionChange = useCallback((lat: number, lng: number, zoom: number) => {
     setMapPosition({ lat, lng, zoom })
     saveMapPosition({ lat, lng, zoom })
   }, [setMapPosition])
 
-  const handleLocate = () => {
+  const handleLocate = useCallback(() => {
+    if (userLocation) {
+      flyTo({ lat: userLocation.lat, lng: userLocation.lng, zoom: 17 })
+      return
+    }
     if (!navigator.geolocation) return
     navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        setMapPosition({ lat: pos.coords.latitude, lng: pos.coords.longitude, zoom: 16 })
-      },
-      () => {}
+      (pos) => flyTo({ lat: pos.coords.latitude, lng: pos.coords.longitude, zoom: 17 }),
+      () => showLocToast('Enable location for live tracking')
     )
-  }
+  }, [userLocation, flyTo])
 
   const handleSearchSelect = useCallback((lat: number, lng: number) => {
     setMapPosition({ lat, lng, zoom: 15 })
@@ -192,6 +222,7 @@ export default function MapView() {
           onPositionChange={handlePositionChange}
         />
 
+        {/* Lead pins */}
         {visibleLeads.map((lead) => {
           const editable = canEditLead(lead)
           return (
@@ -206,33 +237,37 @@ export default function MapView() {
             />
           )
         })}
+
+        {/* Live location dot */}
+        {userLocation && (
+          <Marker
+            position={[userLocation.lat, userLocation.lng]}
+            icon={LOCATION_ICON}
+            zIndexOffset={2000}
+            interactive={false}
+          />
+        )}
       </MapContainer>
 
       {/* ── Top overlays ── */}
       <div className="absolute top-3 left-3 right-3 z-[1000] flex flex-col items-center gap-2 pointer-events-none">
-        {/* Search bar */}
         <div className="w-full max-w-md pointer-events-auto">
           <SearchBar onSelect={handleSearchSelect} />
         </div>
-        {/* Filter bar */}
         <div className="pointer-events-auto">
           <FilterBar />
         </div>
       </div>
 
       {/* ── Area summary (top-right) ── */}
-      <div className="absolute top-3 right-3 z-[1000] pointer-events-none" style={{ top: '168px' }}>
+      <div className="absolute right-3 z-[1000] pointer-events-none" style={{ top: '168px' }}>
         <AreaSummary leads={visibleLeads} bounds={bounds} />
       </div>
 
       {/* ── FAB controls (bottom right) ── */}
       <div className="absolute bottom-6 right-4 z-[1000] flex flex-col gap-2">
-        {/* Add pin button */}
         <button
-          onClick={() => {
-            // Prompt user to click the map
-            setCurrentView('map')
-          }}
+          onClick={() => setCurrentView('map')}
           title="Click the map to drop a pin"
           className="w-11 h-11 rounded-xl flex items-center justify-center shadow-lg transition-all active:scale-95"
           style={{
@@ -243,23 +278,42 @@ export default function MapView() {
           <Plus size={20} className="text-white" />
         </button>
 
-        {/* Locate me */}
+        {/* Locate me — highlights when we have a live fix */}
         <button
           onClick={handleLocate}
           title="My location"
           className="w-11 h-11 rounded-xl flex items-center justify-center transition-all active:scale-95"
           style={{
-            background: 'rgba(10,14,28,0.9)',
+            background: userLocation ? 'rgba(66,133,244,0.2)' : 'rgba(10,14,28,0.9)',
             backdropFilter: 'blur(12px)',
-            border: '1px solid rgba(255,255,255,0.12)',
+            border: `1px solid ${userLocation ? 'rgba(66,133,244,0.5)' : 'rgba(255,255,255,0.12)'}`,
             boxShadow: '0 4px 20px rgba(0,0,0,0.4)',
           }}
         >
-          <Locate size={18} className="text-white/70" />
+          <Locate size={18} style={{ color: userLocation ? '#4285F4' : 'rgba(240,244,255,0.7)' }} />
         </button>
       </div>
 
-      {/* ── Locked lead notice (rep clicked another rep's pin) ── */}
+      {/* ── Location permission toast ── */}
+      {locationToast && (
+        <div
+          className="absolute bottom-24 left-1/2 -translate-x-1/2 z-[1200]
+            flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-medium
+            animate-slide-up pointer-events-none whitespace-nowrap"
+          style={{
+            background: 'rgba(8,11,24,0.95)',
+            backdropFilter: 'blur(16px)',
+            border: '1px solid rgba(255,255,255,0.12)',
+            color: 'rgba(240,244,255,0.75)',
+            boxShadow: '0 8px 24px rgba(0,0,0,0.5)',
+          }}
+        >
+          <Locate size={13} style={{ color: '#4285F4' }} />
+          {locationToast}
+        </div>
+      )}
+
+      {/* ── Locked lead notice ── */}
       {lockedLead && !isAdmin && (
         <div
           className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[1200]
@@ -273,9 +327,7 @@ export default function MapView() {
           }}
         >
           <span className="text-base">🔒</span>
-          <span>
-            Assigned to <strong className="text-white">{lockedLead.assignedRep || 'another rep'}</strong>
-          </span>
+          Assigned to <strong className="text-white ml-1">{lockedLead.assignedRep || 'another rep'}</strong>
         </div>
       )}
 

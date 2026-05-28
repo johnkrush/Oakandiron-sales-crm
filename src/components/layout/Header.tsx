@@ -21,7 +21,7 @@ export default function Header() {
         >
           <MapPin size={14} className="text-white" />
         </div>
-        <span className="font-bold text-white text-sm tracking-tight">Canvass</span>
+        <span className="font-bold text-white text-xs tracking-tight leading-tight">OakandIron<br/>Sales</span>
       </div>
 
       {/* Spacer on desktop */}

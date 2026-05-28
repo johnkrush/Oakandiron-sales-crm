@@ -218,6 +218,59 @@
   color: rgba(240, 244, 255, 0.45) !important;
 }
 
+/* ── Live location dot ─────────────────────────────────── */
+.location-dot-wrapper {
+  position: relative;
+  width: 20px;
+  height: 20px;
+}
+
+.location-dot-core {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #4285F4;
+  border: 2.5px solid #fff;
+  box-shadow: 0 2px 10px rgba(66, 133, 244, 0.8), 0 0 0 3px rgba(66, 133, 244, 0.2);
+  z-index: 2;
+}
+
+.location-dot-ring {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: rgba(66, 133, 244, 0.2);
+  transform: translate(-50%, -50%) scale(0.3);
+  animation: locPulse 2.2s ease-out infinite;
+  z-index: 1;
+}
+
+.location-dot-ring-2 {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: rgba(66, 133, 244, 0.12);
+  transform: translate(-50%, -50%) scale(0.3);
+  animation: locPulse 2.2s ease-out infinite 0.75s;
+  z-index: 1;
+}
+
+@keyframes locPulse {
+  0%   { transform: translate(-50%, -50%) scale(0.3); opacity: 1; }
+  70%  { opacity: 0.4; }
+  100% { transform: translate(-50%, -50%) scale(1.6); opacity: 0; }
+}
+
 /* ── Custom map pin hover ───────────────────────────────── */
 .canvass-pin {
   cursor: pointer;

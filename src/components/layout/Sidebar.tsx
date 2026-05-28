@@ -40,7 +40,7 @@ export default function Sidebar() {
         >
           <MapPin size={16} className="text-white" />
         </div>
-        <span className="font-bold text-white tracking-tight">Canvass</span>
+        <span className="font-bold text-white tracking-tight text-xs leading-tight">OakandIron<br/>Sales</span>
       </div>
 
       {/* Nav */}

@@ -151,7 +151,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     (email: string, password: string): boolean => {
       const trimEmail = email.trim().toLowerCase()
       // Admin account
-      if (trimEmail === 'admin@canvass.app' && password === 'admin123') {
+      if (trimEmail === 'admin@canvass.app' && password === 'Oakandiron26') {
         const u: User = { email: trimEmail, name: 'Admin User', role: 'admin' }
         setUser(u)
         saveUser(u)
