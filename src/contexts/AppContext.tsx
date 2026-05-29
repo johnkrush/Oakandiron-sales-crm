@@ -33,6 +33,14 @@ import {
   saveRepCredentials,
   hasStoredRepCredentials,
 } from '../utils/storage'
+import {
+  supabase,
+  LeadRow,
+  TeamMemberRow,
+  rowToLead,
+  leadToRow,
+  rowToRepCredential,
+} from '../utils/supabase'
 import { DEMO_LEADS } from '../data/demoData'
 
 interface FlyToTarget {
@@ -46,7 +54,7 @@ interface AppContextValue {
   // Auth
   user: User | null
   isAdmin: boolean
-  login: (email: string, password: string) => boolean
+  login: (email: string, password: string) => Promise<boolean>
   logout: () => void
   updateUser: (updates: Partial<User>) => void
 
@@ -93,27 +101,37 @@ interface AppContextValue {
 
 const AppContext = createContext<AppContextValue | null>(null)
 
+// ── Build initial teamMemberRows from localStorage ────────────────
+function buildInitialRows(): TeamMemberRow[] {
+  const names = hasStoredTeamMembers() ? getTeamMembers() : DEFAULT_TEAM_MEMBERS
+  const creds = hasStoredRepCredentials() ? getRepCredentials() : DEFAULT_REP_CREDENTIALS
+  return names.map((name) => {
+    const cred = creds.find((c) => c.name === name)
+    return {
+      id: cred?.id ?? crypto.randomUUID(),
+      name,
+      email: cred?.email ?? null,
+      password: cred?.password ?? null,
+      role: 'rep' as const,
+      created_at: '',
+    }
+  })
+}
+
 export function AppProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(() => {
     const u = getUser()
-    // Migrate old "Team Lead" role string to 'admin'
-    if (u && (u.role as string) === 'Team Lead') {
-      return { ...u, role: 'admin' }
-    }
+    if (u && (u.role as string) === 'Team Lead') return { ...u, role: 'admin' }
     return u
   })
 
-  const [leads, setLeads] = useState<Lead[]>(() => {
-    if (hasStoredLeads()) return getLeads()
-    saveLeads(DEMO_LEADS)
-    return DEMO_LEADS
-  })
+  // Leads — start from localStorage, Supabase overwrites on mount
+  const [leads, setLeads] = useState<Lead[]>(() =>
+    hasStoredLeads() ? getLeads() : DEMO_LEADS
+  )
 
-  const [repCredentials, setRepCredentialsState] = useState<RepCredential[]>(() => {
-    if (hasStoredRepCredentials()) return getRepCredentials()
-    saveRepCredentials(DEFAULT_REP_CREDENTIALS)
-    return DEFAULT_REP_CREDENTIALS
-  })
+  // Team members — internal rows (email/password included), derived publicly
+  const [teamMemberRows, setTeamMemberRows] = useState<TeamMemberRow[]>(buildInitialRows)
 
   const [currentView, setCurrentView] = useState<View>('map')
   const [mapPosition, setMapPositionState] = useState<MapPosition>(() => getMapPosition())
@@ -121,37 +139,182 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [activeFilters, setActiveFilters] = useState<LeadStatus[]>([])
   const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null)
 
-  const [teamMembers, setTeamMembersState] = useState<string[]>(() => {
-    if (hasStoredTeamMembers()) return getTeamMembers()
-    saveTeamMembers(DEFAULT_TEAM_MEMBERS)
-    return DEFAULT_TEAM_MEMBERS
-  })
+  // Publicly exposed derivations
+  const teamMembers = useMemo(() => teamMemberRows.map((r) => r.name), [teamMemberRows])
+  const repCredentials = useMemo(
+    () => teamMemberRows.filter((r) => !!r.email).map(rowToRepCredential),
+    [teamMemberRows]
+  )
 
+  // ── localStorage sync (backup whenever state changes) ────────────
+  useEffect(() => { saveLeads(leads) }, [leads])
+  useEffect(() => {
+    saveTeamMembers(teamMemberRows.map((r) => r.name))
+    saveRepCredentials(teamMemberRows.filter((r) => !!r.email).map(rowToRepCredential))
+  }, [teamMemberRows])
+
+  // ── Supabase: initial fetch + real-time subscription ─────────────
+  useEffect(() => {
+    let mounted = true
+
+    async function init() {
+      // Leads
+      const { data: leadsData, error: leadsErr } = await supabase
+        .from('leads')
+        .select('*')
+        .order('created_at', { ascending: true })
+
+      if (mounted && !leadsErr && leadsData) {
+        if (leadsData.length > 0) {
+          setLeads((leadsData as LeadRow[]).map(rowToLead))
+        } else {
+          // First run — seed demo leads with real UUIDs
+          const seeded = DEMO_LEADS.map((d) => ({ ...d, id: crypto.randomUUID() }))
+          setLeads(seeded)
+          const { error } = await supabase.from('leads').insert(seeded.map(leadToRow))
+          if (error) console.error('[supabase] seed leads:', error.message)
+        }
+      } else if (leadsErr) {
+        console.error('[supabase] fetch leads:', leadsErr.message)
+      }
+
+      // Team members
+      const { data: teamData, error: teamErr } = await supabase
+        .from('team_members')
+        .select('*')
+        .order('created_at', { ascending: true })
+
+      if (mounted && !teamErr && teamData) {
+        if (teamData.length > 0) {
+          setTeamMemberRows(teamData as TeamMemberRow[])
+        } else {
+          // First run — seed default rep credentials
+          const seeded: TeamMemberRow[] = DEFAULT_REP_CREDENTIALS.map((c) => ({
+            id: crypto.randomUUID(),
+            name: c.name,
+            email: c.email,
+            password: c.password,
+            role: 'rep' as const,
+            created_at: new Date().toISOString(),
+          }))
+          setTeamMemberRows(seeded)
+          const { error } = await supabase.from('team_members').insert(seeded)
+          if (error) console.error('[supabase] seed team_members:', error.message)
+        }
+      } else if (teamErr) {
+        console.error('[supabase] fetch team_members:', teamErr.message)
+      }
+    }
+
+    init().catch((err) => console.error('[supabase] init:', err))
+
+    // Real-time
+    const channel = supabase
+      .channel('oakandiron-realtime')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'leads' },
+        (payload) => {
+          if (!mounted) return
+          if (payload.eventType === 'INSERT') {
+            setLeads((prev) =>
+              prev.some((l) => l.id === (payload.new as LeadRow).id)
+                ? prev
+                : [...prev, rowToLead(payload.new as LeadRow)]
+            )
+          } else if (payload.eventType === 'UPDATE') {
+            setLeads((prev) =>
+              prev.map((l) =>
+                l.id === (payload.new as LeadRow).id ? rowToLead(payload.new as LeadRow) : l
+              )
+            )
+          } else if (payload.eventType === 'DELETE') {
+            setLeads((prev) =>
+              prev.filter((l) => l.id !== (payload.old as { id: string }).id)
+            )
+          }
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'team_members' },
+        (payload) => {
+          if (!mounted) return
+          if (payload.eventType === 'INSERT') {
+            setTeamMemberRows((prev) =>
+              prev.some((r) => r.id === (payload.new as TeamMemberRow).id)
+                ? prev
+                : [...prev, payload.new as TeamMemberRow]
+            )
+          } else if (payload.eventType === 'UPDATE') {
+            setTeamMemberRows((prev) =>
+              prev.map((r) =>
+                r.id === (payload.new as TeamMemberRow).id
+                  ? (payload.new as TeamMemberRow)
+                  : r
+              )
+            )
+          } else if (payload.eventType === 'DELETE') {
+            setTeamMemberRows((prev) =>
+              prev.filter((r) => r.id !== (payload.old as { id: string }).id)
+            )
+          }
+        }
+      )
+      .subscribe()
+
+    return () => {
+      mounted = false
+      supabase.removeChannel(channel)
+    }
+  }, [])
+
+  // ── Auth ──────────────────────────────────────────────────────────
   const isAdmin = user?.role === 'admin'
 
   const login = useCallback(
-    (email: string, password: string): boolean => {
+    async (email: string, password: string): Promise<boolean> => {
       const trimEmail = email.trim().toLowerCase()
-      // Admin account
+
+      // Admin — hardcoded, no DB query needed
       if (trimEmail === 'admin@canvass.app' && password === 'Oakandiron26') {
         const u: User = { email: trimEmail, name: 'Admin User', role: 'admin' }
         setUser(u)
         saveUser(u)
         return true
       }
-      // Rep accounts (read fresh from state so changes are reflected)
-      const match = repCredentials.find(
-        (c) => c.email.toLowerCase() === trimEmail && c.password === password
-      )
-      if (match) {
-        const u: User = { email: trimEmail, name: match.name, role: 'rep' }
-        setUser(u)
-        saveUser(u)
-        return true
+
+      // Rep — query Supabase for up-to-date credentials
+      try {
+        const { data, error } = await supabase
+          .from('team_members')
+          .select('*')
+          .eq('email', trimEmail)
+          .single()
+
+        if (!error && data && (data as TeamMemberRow).password === password) {
+          const row = data as TeamMemberRow
+          const u: User = { email: trimEmail, name: row.name, role: 'rep' }
+          setUser(u)
+          saveUser(u)
+          return true
+        }
+      } catch {
+        // Supabase unreachable — fall back to local state
+        const row = teamMemberRows.find(
+          (r) => r.email?.toLowerCase() === trimEmail && r.password === password
+        )
+        if (row) {
+          const u: User = { email: trimEmail, name: row.name, role: 'rep' }
+          setUser(u)
+          saveUser(u)
+          return true
+        }
       }
+
       return false
     },
-    [repCredentials]
+    [teamMemberRows]
   )
 
   const logout = useCallback(() => {
@@ -171,6 +334,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     })
   }, [])
 
+  // ── Lead CRUD ─────────────────────────────────────────────────────
   const canEditLead = useCallback(
     (lead: Lead): boolean => {
       if (!user) return false
@@ -183,40 +347,38 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const addLead = useCallback(
     (data: Omit<Lead, 'id' | 'createdAt' | 'updatedAt'>): Lead => {
       const now = new Date().toISOString()
-      const lead: Lead = {
-        ...data,
-        id: `lead-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-        createdAt: now,
-        updatedAt: now,
-      }
-      setLeads((prev) => {
-        const next = [...prev, lead]
-        saveLeads(next)
-        return next
-      })
+      const lead: Lead = { ...data, id: crypto.randomUUID(), createdAt: now, updatedAt: now }
+      setLeads((prev) => [...prev, lead])
+      supabase
+        .from('leads')
+        .insert(leadToRow(lead))
+        .then(({ error }) => { if (error) console.error('[supabase] addLead:', error.message) })
       return lead
     },
     []
   )
 
   const updateLead = useCallback((updated: Lead) => {
-    setLeads((prev) => {
-      const next = prev.map((l) =>
-        l.id === updated.id ? { ...updated, updatedAt: new Date().toISOString() } : l
-      )
-      saveLeads(next)
-      return next
-    })
+    const now = new Date().toISOString()
+    const withTs = { ...updated, updatedAt: now }
+    setLeads((prev) => prev.map((l) => (l.id === updated.id ? withTs : l)))
+    supabase
+      .from('leads')
+      .update({ ...leadToRow(withTs), updated_at: now })
+      .eq('id', updated.id)
+      .then(({ error }) => { if (error) console.error('[supabase] updateLead:', error.message) })
   }, [])
 
   const deleteLead = useCallback((id: string) => {
-    setLeads((prev) => {
-      const next = prev.filter((l) => l.id !== id)
-      saveLeads(next)
-      return next
-    })
+    setLeads((prev) => prev.filter((l) => l.id !== id))
+    supabase
+      .from('leads')
+      .delete()
+      .eq('id', id)
+      .then(({ error }) => { if (error) console.error('[supabase] deleteLead:', error.message) })
   }, [])
 
+  // ── Map ───────────────────────────────────────────────────────────
   const setMapPosition = useCallback((p: MapPosition) => {
     setMapPositionState(p)
     saveMapPosition(p)
@@ -225,64 +387,148 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const flyTo = useCallback((target: FlyToTarget) => setFlyToTarget(target), [])
   const clearFlyTo = useCallback(() => setFlyToTarget(null), [])
 
-  const toggleFilter = useCallback((s: LeadStatus) => {
-    setActiveFilters((prev) =>
-      prev.includes(s) ? prev.filter((f) => f !== s) : [...prev, s]
-    )
-  }, [])
-
+  // ── Filters ───────────────────────────────────────────────────────
+  const toggleFilter = useCallback(
+    (s: LeadStatus) =>
+      setActiveFilters((prev) =>
+        prev.includes(s) ? prev.filter((f) => f !== s) : [...prev, s]
+      ),
+    []
+  )
   const clearFilters = useCallback(() => setActiveFilters([]), [])
   const selectLead = useCallback((id: string | null) => setSelectedLeadId(id), [])
 
-  const setTeamMembers = useCallback((members: string[]) => {
-    setTeamMembersState(members)
-    saveTeamMembers(members)
+  // ── Team member CRUD ──────────────────────────────────────────────
+  // Takes a plain string[] and reconciles against current rows
+  const setTeamMembers = useCallback((newNames: string[]) => {
+    setTeamMemberRows((prev) => {
+      const prevNameSet = new Set(prev.map((r) => r.name))
+      const nextNameSet = new Set(newNames)
+      const toAdd = newNames.filter((n) => !prevNameSet.has(n))
+      const toRemove = [...prevNameSet].filter((n) => !nextNameSet.has(n))
+
+      let updated = prev.filter((r) => !toRemove.includes(r.name))
+
+      for (const name of toAdd) {
+        const id = crypto.randomUUID()
+        updated = [
+          ...updated,
+          { id, name, email: null, password: null, role: 'rep', created_at: new Date().toISOString() },
+        ]
+        supabase
+          .from('team_members')
+          .insert({ id, name, role: 'rep' })
+          .then(({ error }) => { if (error) console.error('[supabase] addTeamMember:', error.message) })
+      }
+
+      for (const name of toRemove) {
+        supabase
+          .from('team_members')
+          .delete()
+          .eq('name', name)
+          .then(({ error }) => { if (error) console.error('[supabase] removeTeamMember:', error.message) })
+      }
+
+      return updated
+    })
   }, [])
 
-  // ── Rep credential management (admin only) ───────────────────
+  // Adds email+password to an existing team member row (or inserts if missing)
   const addRepCredential = useCallback((cred: Omit<RepCredential, 'id'>) => {
-    const newCred: RepCredential = {
-      ...cred,
-      id: `rep-${Date.now()}`,
+    setTeamMemberRows((prev) => {
+      const existing = prev.find((r) => r.name === cred.name)
+      if (existing) {
+        supabase
+          .from('team_members')
+          .update({ email: cred.email, password: cred.password })
+          .eq('id', existing.id)
+          .then(({ error }) => { if (error) console.error('[supabase] addRepCredential:', error.message) })
+        return prev.map((r) =>
+          r.id === existing.id ? { ...r, email: cred.email, password: cred.password } : r
+        )
+      }
+      // Fallback: insert new row (name was not in team list yet)
+      const id = crypto.randomUUID()
+      supabase
+        .from('team_members')
+        .insert({ id, name: cred.name, email: cred.email, password: cred.password, role: 'rep' })
+        .then(({ error }) => { if (error) console.error('[supabase] addRepCredential (insert):', error.message) })
+      return [
+        ...prev,
+        { id, name: cred.name, email: cred.email, password: cred.password, role: 'rep', created_at: new Date().toISOString() },
+      ]
+    })
+  }, [])
+
+  const updateRepCredential = useCallback((id: string, updates: Partial<RepCredential>) => {
+    setTeamMemberRows((prev) =>
+      prev.map((r) =>
+        r.id === id
+          ? {
+              ...r,
+              ...(updates.email !== undefined ? { email: updates.email } : {}),
+              ...(updates.password !== undefined ? { password: updates.password } : {}),
+            }
+          : r
+      )
+    )
+    const dbUpdates: Partial<{ email: string; password: string }> = {}
+    if (updates.email !== undefined) dbUpdates.email = updates.email
+    if (updates.password !== undefined) dbUpdates.password = updates.password
+    if (Object.keys(dbUpdates).length > 0) {
+      supabase
+        .from('team_members')
+        .update(dbUpdates)
+        .eq('id', id)
+        .then(({ error }) => { if (error) console.error('[supabase] updateRepCredential:', error.message) })
     }
-    setRepCredentialsState((prev) => {
-      const updated = [...prev, newCred]
-      saveRepCredentials(updated)
-      return updated
-    })
   }, [])
 
-  const updateRepCredential = useCallback(
-    (id: string, updates: Partial<RepCredential>) => {
-      setRepCredentialsState((prev) => {
-        const updated = prev.map((c) => (c.id === id ? { ...c, ...updates } : c))
-        saveRepCredentials(updated)
-        return updated
-      })
-    },
-    []
-  )
-
+  // Clears email/password (removes login ability) but keeps the name in the team list
   const deleteRepCredential = useCallback((id: string) => {
-    setRepCredentialsState((prev) => {
-      const updated = prev.filter((c) => c.id !== id)
-      saveRepCredentials(updated)
-      return updated
-    })
+    setTeamMemberRows((prev) =>
+      prev.map((r) => (r.id === id ? { ...r, email: null, password: null } : r))
+    )
+    supabase
+      .from('team_members')
+      .update({ email: null, password: null })
+      .eq('id', id)
+      .then(({ error }) => { if (error) console.error('[supabase] deleteRepCredential:', error.message) })
   }, [])
 
+  // ── Data reset ────────────────────────────────────────────────────
   const clearData = useCallback(() => {
+    const freshLeads = DEMO_LEADS.map((d) => ({ ...d, id: crypto.randomUUID() }))
+    const freshTeam: TeamMemberRow[] = DEFAULT_REP_CREDENTIALS.map((c) => ({
+      id: crypto.randomUUID(),
+      name: c.name,
+      email: c.email,
+      password: c.password,
+      role: 'rep' as const,
+      created_at: new Date().toISOString(),
+    }))
+
     clearAllData()
-    saveLeads(DEMO_LEADS)
-    saveTeamMembers(DEFAULT_TEAM_MEMBERS)
-    saveRepCredentials(DEFAULT_REP_CREDENTIALS)
-    setLeads(DEMO_LEADS)
-    setTeamMembersState(DEFAULT_TEAM_MEMBERS)
-    setRepCredentialsState(DEFAULT_REP_CREDENTIALS)
+    setLeads(freshLeads)
+    setTeamMemberRows(freshTeam)
     setActiveFilters([])
     setSelectedLeadId(null)
+
+    async function resetSupabase() {
+      // Wipe and re-seed leads
+      await supabase.from('leads').delete().neq('id', '00000000-0000-0000-0000-000000000000')
+      const { error: leadsErr } = await supabase.from('leads').insert(freshLeads.map(leadToRow))
+      if (leadsErr) console.error('[supabase] clearData leads:', leadsErr.message)
+
+      // Wipe and re-seed team members
+      await supabase.from('team_members').delete().neq('id', '00000000-0000-0000-0000-000000000000')
+      const { error: teamErr } = await supabase.from('team_members').insert(freshTeam)
+      if (teamErr) console.error('[supabase] clearData team_members:', teamErr.message)
+    }
+    resetSupabase().catch(console.error)
   }, [])
 
+  // ── Context value ─────────────────────────────────────────────────
   const value = useMemo<AppContextValue>(
     () => ({
       user,

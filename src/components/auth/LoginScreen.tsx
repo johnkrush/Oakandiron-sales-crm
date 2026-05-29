@@ -26,8 +26,7 @@ export default function LoginScreen() {
     e.preventDefault()
     setError('')
     setLoading(true)
-    await new Promise((r) => setTimeout(r, 500))
-    const ok = login(email.trim(), password)
+    const ok = await login(email.trim(), password)
     if (!ok) setError('Invalid email or password.')
     setLoading(false)
   }
@@ -168,7 +167,7 @@ export default function LoginScreen() {
         </div>
 
         <p className="text-center text-xs text-dim mt-6">
-          © 2025 OakandIron Sales · All data stored locally
+          © 2025 OakandIron Sales · Real-time sync powered by Supabase
         </p>
       </div>
     </div>

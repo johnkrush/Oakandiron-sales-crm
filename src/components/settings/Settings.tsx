@@ -300,15 +300,7 @@ export default function SettingsPage() {
   // ── Team members ─────────────────────────────────────────────
   const [members, setMembers] = useState<string[]>(teamMembers)
   const newMemberRef = useRef<HTMLInputElement | null>(null)
-  useEffect(() => {
-    console.log('Page loaded, localStorage has:', localStorage.getItem('canvass_team_members'))
-    console.log('Using teams:', teamMembers)
-  }, [])
-  useEffect(() => {
-    console.log('localStorage teamMembers:', localStorage.getItem('canvass_team_members'))
-    console.log('current teams state:', teamMembers)
-    setMembers(teamMembers)
-  }, [teamMembers])
+  useEffect(() => { setMembers(teamMembers) }, [teamMembers])
 
   const handleMemberChange = (i: number, value: string) =>
     setMembers((prev) => prev.map((m, idx) => (idx === i ? value : m)))
@@ -338,12 +330,9 @@ export default function SettingsPage() {
   }
 
   const handleRemoveMember = (i: number) => {
-    console.log('Deleting rep, teams before:', members)
     const updated = members.filter((_, idx) => idx !== i).filter((m) => m.trim())
     setMembers(updated)
     setTeamMembers(updated)
-    console.log('Deleted rep, teams after:', updated)
-    console.log('Saved to localStorage:', localStorage.getItem('canvass_team_members'))
     showToast('Member removed')
   }
 
@@ -595,7 +584,7 @@ export default function SettingsPage() {
         </Section>
 
         <div className="text-center text-xs text-dim pb-4">
-          <p>OakandIron Sales v1.0.0 · All data stored locally · No cloud sync</p>
+          <p>OakandIron Sales v1.0.0 · Real-time sync powered by Supabase</p>
         </div>
       </div>
     </>
