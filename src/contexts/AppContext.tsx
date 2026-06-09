@@ -172,11 +172,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
       if (leadsErr) console.error('[supabase] fetch leads:', leadsErr.message)
       if (teamErr) console.error('[supabase] fetch team_members:', teamErr.message)
 
-      // Only seed when BOTH tables are empty — this is a true first run.
-      // If only leads is empty it means the user deleted their leads intentionally.
+      // Pull whatever is in localStorage so we can detect unsynced leads
+      const localLeads = hasStoredLeads() ? getLeads() : []
+
+      // True first run = both Supabase tables empty AND nothing in localStorage yet
       const isFirstRun = !leadsErr && !teamErr
         && leadsData!.length === 0
         && teamData!.length === 0
+        && localLeads.length === 0
 
       // Leads
       if (!leadsErr && leadsData) {
@@ -185,9 +188,31 @@ export function AppProvider({ children }: { children: ReactNode }) {
           setLeads(seeded)
           const { error } = await supabase.from('leads').insert(seeded.map(leadToRow))
           if (error) console.error('[supabase] seed leads:', error.message)
+        } else if (leadsData.length === 0 && localLeads.length > 0) {
+          // Supabase is empty but localStorage has leads — previous inserts likely failed.
+          // Keep the local leads and re-sync them to Supabase now.
+          setLeads(localLeads)
+          const { error } = await supabase.from('leads').insert(localLeads.map(leadToRow))
+          if (error) console.error('[supabase] resync local leads:', error.message)
         } else {
-          // Respect whatever is in Supabase, including an empty array
-          setLeads((leadsData as LeadRow[]).map(rowToLead))
+          // Supabase has data — use it as the primary source, but also check for any
+          // locally-stored leads that never made it to Supabase (failed inserts).
+          const supabaseLeads = (leadsData as LeadRow[]).map(rowToLead)
+          const supabaseIds = new Set(supabaseLeads.map((l) => l.id))
+          const unsyncedLeads = localLeads.filter((l) => !supabaseIds.has(l.id))
+
+          if (unsyncedLeads.length > 0) {
+            // Try to push the unsynced leads up to Supabase now
+            supabase
+              .from('leads')
+              .insert(unsyncedLeads.map(leadToRow))
+              .then(({ error }) => {
+                if (error) console.error('[supabase] sync unsynced leads:', error.message)
+              })
+            setLeads([...supabaseLeads, ...unsyncedLeads])
+          } else {
+            setLeads(supabaseLeads)
+          }
         }
       }
 
