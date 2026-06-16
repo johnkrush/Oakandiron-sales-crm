@@ -291,10 +291,33 @@ export function AppProvider({ children }: { children: ReactNode }) {
           }
         }
       )
-      .subscribe()
+      .subscribe((status) => {
+        if (status === 'CHANNEL_ERROR') {
+          console.warn('[supabase] realtime channel error — falling back to polling')
+        }
+      })
+
+    // Fallback poll every 30 s in case the WebSocket drops
+    const pollInterval = setInterval(async () => {
+      if (!mounted) return
+      const { data, error } = await supabase
+        .from('leads')
+        .select('*')
+        .order('created_at', { ascending: true })
+      if (!error && data) {
+        setLeads((prev) => {
+          const incoming = (data as LeadRow[]).map(rowToLead)
+          // Only update state if something actually changed
+          const prevIds = prev.map((l) => l.id + l.updatedAt).join()
+          const nextIds = incoming.map((l) => l.id + l.updatedAt).join()
+          return prevIds === nextIds ? prev : incoming
+        })
+      }
+    }, 30_000)
 
     return () => {
       mounted = false
+      clearInterval(pollInterval)
       supabase.removeChannel(channel)
     }
   }, [])
