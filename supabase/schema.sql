@@ -60,6 +60,23 @@ alter table public.team_members add column if not exists password   text;
 alter table public.team_members add column if not exists role       text default 'rep';
 alter table public.team_members add column if not exists created_at timestamptz default now();
 
+-- status must accept all four app values (interested, not-home, follow-up,
+-- not-interested). A table created earlier may have restricted it via an
+-- enum or CHECK constraint, which silently rejects the other statuses.
+-- Make it plain text and drop any restricting CHECK constraints.
+alter table public.leads alter column status type text using status::text;
+
+do $$
+declare c record;
+begin
+  for c in
+    select conname from pg_constraint
+    where conrelid = 'public.leads'::regclass and contype = 'c'
+  loop
+    execute format('alter table public.leads drop constraint %I', c.conname);
+  end loop;
+end $$;
+
 -- ── Realtime ───────────────────────────────────────────────────────
 -- The app subscribes to postgres_changes on both tables.
 alter publication supabase_realtime add table public.leads;
