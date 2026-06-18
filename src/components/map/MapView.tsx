@@ -111,6 +111,7 @@ export default function MapView() {
     user,
     isAdmin,
     canEditLead,
+    updateLead,
     mapPosition,
     setMapPosition,
     flyToTarget,
@@ -299,11 +300,18 @@ export default function MapView() {
             <Marker
               key={lead.id}
               position={[lead.lat, lead.lng]}
+              draggable={editable}
               icon={createTeardropIcon(
                 editable ? STATUS_CONFIG[lead.status].color : STATUS_CONFIG[lead.status].color + '88',
                 editLead?.id === lead.id
               )}
-              eventHandlers={{ click: () => handleMarkerClick(lead) }}
+              eventHandlers={{
+                click: () => handleMarkerClick(lead),
+                dragend: (e) => {
+                  const { lat, lng } = e.target.getLatLng()
+                  updateLead({ ...lead, lat, lng })
+                },
+              }}
             />
           )
         })}
