@@ -334,8 +334,8 @@ export default function MapView() {
         <AreaSummary leads={visibleLeads} bounds={bounds} />
       </div>
 
-      {/* ── Map style toggle (bottom-left) ── */}
-      <div className="absolute bottom-6 left-4 z-[1000]">
+      {/* ── Map style toggle + rep badge (bottom-left) ── */}
+      <div className="absolute bottom-6 left-4 z-[1000] flex flex-col gap-2 items-start">
         {showStylePicker ? (
           <div
             className="flex items-center gap-0.5 p-1 rounded-xl animate-fade-in"
@@ -386,6 +386,23 @@ export default function MapView() {
             <Layers size={15} />
             {MAP_STYLE_LABELS[mapStyle]}
           </button>
+        )}
+
+        {/* Rep indicator badge — sits under the map style toggle */}
+        {!isAdmin && user && (
+          <div
+            className="flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-medium"
+            style={{
+              background: 'rgba(8,18,36,0.88)',
+              backdropFilter: 'blur(16px)',
+              border: '1px solid rgba(29,158,117,0.3)',
+              color: '#1D9E75',
+              boxShadow: '0 4px 16px rgba(0,0,0,0.3)',
+            }}
+          >
+            <span className="w-1.5 h-1.5 rounded-full bg-[#1D9E75] animate-pulse" />
+            {user.name} — your leads only
+          </div>
         )}
       </div>
 
@@ -453,23 +470,6 @@ export default function MapView() {
         >
           <span className="text-base">🔒</span>
           Assigned to <strong className="text-white ml-1">{lockedLead.assignedRep || 'another rep'}</strong>
-        </div>
-      )}
-
-      {/* ── Rep indicator badge ── */}
-      {!isAdmin && user && (
-        <div
-          className="absolute top-3 left-3 z-[1000] flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-medium"
-          style={{
-            background: 'rgba(8,18,36,0.88)',
-            backdropFilter: 'blur(16px)',
-            border: '1px solid rgba(29,158,117,0.3)',
-            color: '#1D9E75',
-            boxShadow: '0 4px 16px rgba(0,0,0,0.3)',
-          }}
-        >
-          <span className="w-1.5 h-1.5 rounded-full bg-[#1D9E75] animate-pulse" />
-          {user.name} — your leads only
         </div>
       )}
 
