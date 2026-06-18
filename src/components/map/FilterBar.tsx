@@ -8,11 +8,11 @@ export default function FilterBar() {
     leads.filter((l) => l.status === status).length
 
   return (
-    <div className="flex items-center gap-1.5 flex-wrap justify-center">
+    <div className="flex items-center gap-1 md:gap-1.5 flex-wrap justify-center">
       {/* All button */}
       <button
         onClick={clearFilters}
-        className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all active:scale-95"
+        className="flex items-center gap-1 md:gap-1.5 px-2 md:px-3 py-1 md:py-1.5 rounded-full text-[10px] md:text-xs font-medium transition-all active:scale-95"
         style={{
           background: activeFilters.length === 0
             ? 'rgba(99,102,241,0.25)'
@@ -35,7 +35,7 @@ export default function FilterBar() {
           <button
             key={status}
             onClick={() => toggleFilter(status)}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all active:scale-95"
+            className="flex items-center gap-1 md:gap-1.5 px-2 md:px-3 py-1 md:py-1.5 rounded-full text-[10px] md:text-xs font-medium transition-all active:scale-95"
             style={{
               background: active
                 ? `${cfg.bgStyle}`
