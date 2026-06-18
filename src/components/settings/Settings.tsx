@@ -2,7 +2,6 @@ import { useState, useEffect, useRef } from 'react'
 import { useApp } from '../../contexts/AppContext'
 import { STATUS_CONFIG, ALL_STATUSES, RepCredential } from '../../types'
 import { exportToCSV } from '../../utils/csv'
-import { importRealLeads, IMPORT_LEAD_COUNT } from '../../utils/importRealLeads'
 import {
   Users,
   Download,
@@ -19,8 +18,6 @@ import {
   EyeOff,
   ShieldCheck,
   Pencil,
-  Upload,
-  Loader2,
 } from 'lucide-react'
 
 // ── Toast ─────────────────────────────────────────────────────────
@@ -362,37 +359,6 @@ export default function SettingsPage() {
     showToast('Data reset to demo leads')
   }
 
-  // ── Import canvassing leads ───────────────────────────────────
-  const [importDone, setImportDone] = useState(
-    () => localStorage.getItem('canvass_import_done') === 'true'
-  )
-  const [importing, setImporting] = useState(false)
-  const [importProgress, setImportProgress] = useState(0)
-  const [importRep, setImportRep] = useState('')
-
-  const handleImport = async () => {
-    setImporting(true)
-    setImportProgress(0)
-    try {
-      const { inserted, failed } = await importRealLeads(
-        importRep,
-        (current) => setImportProgress(current)
-      )
-      localStorage.setItem('canvass_import_done', 'true')
-      setImportDone(true)
-      showToast(
-        failed > 0
-          ? `Imported ${inserted} leads (${failed} failed — check console)`
-          : `Imported ${inserted} leads successfully`
-      )
-    } catch (err) {
-      console.error('[import]', err)
-      showToast('Import failed — check the browser console')
-    } finally {
-      setImporting(false)
-    }
-  }
-
   return (
     <>
       {toast && <Toast message={toast} />}
@@ -593,74 +559,6 @@ export default function SettingsPage() {
             </button>
           </div>
         </Section>
-
-        {/* ── Import Canvassing Leads (admin only) ──────────── */}
-        {isAdmin && (
-          <Section title="Import Canvassing Data" icon={Upload}>
-            <div className="px-5 py-4 space-y-4">
-              {importDone ? (
-                <div className="flex items-center gap-2 text-sm" style={{ color: '#1D9E75' }}>
-                  <CheckCircle size={15} className="shrink-0" />
-                  Import complete — {IMPORT_LEAD_COUNT} leads added to Supabase.
-                </div>
-              ) : (
-                <>
-                  <p className="text-sm text-mid">
-                    Import {IMPORT_LEAD_COUNT} canvassing leads from Mistwell Cres, Great Lakes Blvd,
-                    Petrie Way, Triller Pl, and West River St. Each address is geocoded via Nominatim
-                    (~1 min total).
-                  </p>
-
-                  <div>
-                    <label className="field-label">Assign to Rep</label>
-                    <select
-                      value={importRep}
-                      onChange={(e) => setImportRep(e.target.value)}
-                      className="field-input"
-                      disabled={importing}
-                      style={{ appearance: 'none' }}
-                    >
-                      <option value="" style={{ background: '#0d1426' }}>— Unassigned —</option>
-                      {teamMembers.map((m) => (
-                        <option key={m} value={m} style={{ background: '#0d1426' }}>{m}</option>
-                      ))}
-                    </select>
-                  </div>
-
-                  {importing && (
-                    <div>
-                      <div className="flex items-center justify-between text-xs text-dim mb-1.5">
-                        <span>Geocoding addresses…</span>
-                        <span className="tabular-nums">{importProgress} / {IMPORT_LEAD_COUNT}</span>
-                      </div>
-                      <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.07)' }}>
-                        <div
-                          className="h-full rounded-full transition-all duration-500"
-                          style={{
-                            width: `${(importProgress / IMPORT_LEAD_COUNT) * 100}%`,
-                            background: 'linear-gradient(90deg, #6366f1, #8b5cf6)',
-                          }}
-                        />
-                      </div>
-                    </div>
-                  )}
-
-                  <button
-                    onClick={handleImport}
-                    disabled={importing}
-                    className="btn-primary disabled:opacity-60 disabled:cursor-not-allowed"
-                  >
-                    {importing ? (
-                      <><Loader2 size={14} className="animate-spin" />Importing…</>
-                    ) : (
-                      <><Upload size={14} />Import {IMPORT_LEAD_COUNT} Leads</>
-                    )}
-                  </button>
-                </>
-              )}
-            </div>
-          </Section>
-        )}
 
         {/* ── Danger Zone ───────────────────────────────────── */}
         <Section title="Danger Zone" icon={Trash2}>
