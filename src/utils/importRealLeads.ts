@@ -7,8 +7,8 @@ interface RawLead {
   notes: string
 }
 
-// Burlington city centre — fallback if Nominatim returns no result
-const BURLINGTON_FALLBACK = { lat: 43.3255, lng: -79.799 }
+// Oakville city centre — fallback if Nominatim returns no result
+const OAKVILLE_FALLBACK = { lat: 43.4675, lng: -79.6877 }
 
 const RAW_LEADS: RawLead[] = [
   // ── Mistwell Crescent ──────────────────────────────────────────
@@ -84,12 +84,11 @@ const RAW_LEADS: RawLead[] = [
 export const IMPORT_LEAD_COUNT = RAW_LEADS.length // 59
 
 async function geocodeAddress(shortAddress: string): Promise<{ lat: number; lng: number }> {
-  const query = encodeURIComponent(`${shortAddress}, Burlington, Ontario, Canada`)
+  const url =
+    `https://nominatim.openstreetmap.org/search?street=${encodeURIComponent(shortAddress)}` +
+    `&city=Oakville&state=Ontario&country=Canada&format=json&limit=1`
   try {
-    const res = await fetch(
-      `https://nominatim.openstreetmap.org/search?q=${query}&format=json&limit=1&countrycodes=ca`,
-      { headers: { 'User-Agent': 'OakandIron-Sales-CRM/1.0' } }
-    )
+    const res = await fetch(url, { headers: { 'User-Agent': 'OakandIron-Sales-CRM/1.0' } })
     if (!res.ok) throw new Error(`HTTP ${res.status}`)
     const data: Array<{ lat: string; lon: string }> = await res.json()
     if (data.length > 0) {
@@ -99,7 +98,7 @@ async function geocodeAddress(shortAddress: string): Promise<{ lat: number; lng:
   } catch (err) {
     console.warn('[geocode] Error for:', shortAddress, err)
   }
-  return BURLINGTON_FALLBACK
+  return OAKVILLE_FALLBACK
 }
 
 export async function importRealLeads(
@@ -123,7 +122,7 @@ export async function importRealLeads(
     const lead = {
       id: crypto.randomUUID(),
       householdName: raw.address,
-      address: `${raw.address}, Burlington, ON`,
+      address: `${raw.address}, Oakville, ON`,
       lat: coords.lat,
       lng: coords.lng,
       contactName: '',
