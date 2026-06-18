@@ -100,6 +100,13 @@ interface AppContextValue {
   clearData: () => void
 }
 
+// Owner / admin logins — hardcoded, full admin access. Emails are lowercase.
+const OWNER_ACCOUNTS = [
+  { email: 'admin@canvass.app', password: 'Oakandiron26', name: 'Admin User' },
+  { email: 'johnnie.krush@canvass.app', password: 'Bangjob123', name: 'Johnnie Krush' },
+  { email: 'chris.araujo@canvass.app', password: 'Bangjob123', name: 'Chris Araujo' },
+]
+
 const AppContext = createContext<AppContextValue | null>(null)
 
 // ── Build initial teamMemberRows from localStorage ────────────────
@@ -349,9 +356,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
     async (email: string, password: string): Promise<boolean> => {
       const trimEmail = email.trim().toLowerCase()
 
-      // Admin — hardcoded, no DB query needed
-      if (trimEmail === 'admin@canvass.app' && password === 'Oakandiron26') {
-        const u: User = { email: trimEmail, name: 'Admin User', role: 'admin' }
+      // Owners / admins — hardcoded, no DB query needed
+      const owner = OWNER_ACCOUNTS.find(
+        (a) => a.email === trimEmail && a.password === password
+      )
+      if (owner) {
+        const u: User = { email: trimEmail, name: owner.name, role: 'admin' }
         setUser(u)
         saveUser(u)
         return true
