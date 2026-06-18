@@ -330,7 +330,7 @@ export default function MapView() {
       </div>
 
       {/* ── Area summary (top-right, below filter bar) ── */}
-      <div className="absolute right-3 z-[1000] pointer-events-none top-[140px] md:top-[168px]">
+      <div className="absolute right-3 z-[1000] pointer-events-none top-[126px] md:top-[150px]">
         <AreaSummary leads={visibleLeads} bounds={bounds} />
       </div>
 
