@@ -1,41 +1,44 @@
 import { useState, type FormEvent } from 'react'
 import { useApp } from '../../contexts/AppContext'
-import { MapPin, Eye, EyeOff, AlertCircle, ChevronDown } from 'lucide-react'
+import { MapPin, Eye, EyeOff, AlertCircle } from 'lucide-react'
 
-const DEMO_ACCOUNTS = [
-  { label: 'Admin', email: 'admin@canvass.app', password: 'Oakandiron26', role: 'Team Lead' },
-  { label: 'Chris', email: 'chris@canvass.app', password: 'canvass123', role: 'Sales Rep' },
-  { label: 'Emma', email: 'emma@canvass.app', password: 'canvass123', role: 'Sales Rep' },
-  { label: 'Sarah', email: 'sarah@canvass.app', password: 'canvass123', role: 'Sales Rep' },
-  { label: 'Mike', email: 'mike@canvass.app', password: 'canvass123', role: 'Sales Rep' },
-  { label: 'Lisa', email: 'lisa@canvass.app', password: 'canvass123', role: 'Sales Rep' },
-  { label: 'David', email: 'david@canvass.app', password: 'canvass123', role: 'Sales Rep' },
-  { label: 'Tom', email: 'tom@canvass.app', password: 'canvass123', role: 'Sales Rep' },
-]
+// Remembers the last successful login so returning users have their
+// credentials pre-filled. Stored locally on the device only.
+const SAVED_LOGIN_KEY = 'canvass_saved_login'
+
+function getSavedLogin(): { email: string; password: string } | null {
+  try {
+    return JSON.parse(localStorage.getItem(SAVED_LOGIN_KEY) || 'null')
+  } catch {
+    return null
+  }
+}
 
 export default function LoginScreen() {
   const { login } = useApp()
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
+  const saved = getSavedLogin()
+  const [email, setEmail] = useState(saved?.email ?? '')
+  const [password, setPassword] = useState(saved?.password ?? '')
   const [showPw, setShowPw] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
-  const [showAccounts, setShowAccounts] = useState(false)
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
     setError('')
     setLoading(true)
-    const ok = await login(email.trim(), password)
-    if (!ok) setError('Invalid email or password.')
+    const trimmedEmail = email.trim()
+    const ok = await login(trimmedEmail, password)
+    if (ok) {
+      // Save credentials so they're pre-filled next time on this device
+      localStorage.setItem(
+        SAVED_LOGIN_KEY,
+        JSON.stringify({ email: trimmedEmail, password })
+      )
+    } else {
+      setError('Invalid email or password.')
+    }
     setLoading(false)
-  }
-
-  const fillAccount = (acc: (typeof DEMO_ACCOUNTS)[number]) => {
-    setEmail(acc.email)
-    setPassword(acc.password)
-    setError('')
-    setShowAccounts(false)
   }
 
   return (
@@ -126,44 +129,6 @@ export default function LoginScreen() {
               )}
             </button>
           </form>
-
-          {/* Demo account picker */}
-          <div className="mt-5 pt-4" style={{ borderTop: '1px solid rgba(255,255,255,0.07)' }}>
-            <button
-              type="button"
-              onClick={() => setShowAccounts((v) => !v)}
-              className="w-full flex items-center justify-between text-xs text-dim hover:text-white/60 transition-colors"
-            >
-              <span>Demo accounts — click to fill</span>
-              <ChevronDown
-                size={13}
-                className="transition-transform"
-                style={{ transform: showAccounts ? 'rotate(180deg)' : 'none' }}
-              />
-            </button>
-
-            {showAccounts && (
-              <div className="mt-2.5 grid grid-cols-2 gap-1.5 animate-slide-up">
-                {DEMO_ACCOUNTS.map((acc) => (
-                  <button
-                    key={acc.email}
-                    type="button"
-                    onClick={() => fillAccount(acc)}
-                    className="text-left px-3 py-2 rounded-xl transition-all"
-                    style={{
-                      background: 'rgba(255,255,255,0.04)',
-                      border: '1px solid rgba(255,255,255,0.08)',
-                    }}
-                    onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(99,102,241,0.1)'; e.currentTarget.style.borderColor = 'rgba(99,102,241,0.35)' }}
-                    onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.04)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)' }}
-                  >
-                    <p className="text-xs font-semibold text-white">{acc.label}</p>
-                    <p className="text-[10px] text-dim mt-0.5">{acc.role}</p>
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
         </div>
 
         <p className="text-center text-xs text-dim mt-6">
