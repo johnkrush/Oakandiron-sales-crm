@@ -128,8 +128,8 @@ export default function PinForm({ pendingPin, existingLead, onClose }: Props) {
               <MapPin size={14} style={{ color: STATUS_CONFIG[form.status as LeadStatus].color }} />
             </div>
             <div>
-              <h3 className="text-sm font-semibold text-white">
-                {isNew ? 'New Lead' : (existingLead?.householdName || 'Edit Lead')}
+              <h3 className="text-sm font-semibold text-white truncate max-w-[240px]">
+                {isNew ? 'New Lead' : (existingLead?.notes || existingLead?.address || 'Edit Lead')}
               </h3>
               {lat && lng && (
                 <p className="text-[10px] text-dim mt-0.5">
@@ -178,14 +178,13 @@ export default function PinForm({ pendingPin, existingLead, onClose }: Props) {
             </div>
 
             <div>
-              <label className="field-label">Household Name</label>
-              <input
-                type="text"
-                value={form.householdName}
-                onChange={(e) => set('householdName', e.target.value)}
-                placeholder="e.g. Morrison Family"
-                className="field-input"
-                required
+              <label className="field-label">Notes</label>
+              <textarea
+                value={form.notes}
+                onChange={(e) => set('notes', e.target.value)}
+                placeholder="Add visit notes, follow-up actions…"
+                rows={3}
+                className="field-input resize-none"
               />
             </div>
 
@@ -274,17 +273,6 @@ export default function PinForm({ pendingPin, existingLead, onClose }: Props) {
                   <span className="ml-auto text-[10px] text-white/30">auto-assigned</span>
                 </div>
               )}
-            </div>
-
-            <div>
-              <label className="field-label">Notes</label>
-              <textarea
-                value={form.notes}
-                onChange={(e) => set('notes', e.target.value)}
-                placeholder="Add visit notes, follow-up actions…"
-                rows={3}
-                className="field-input resize-none"
-              />
             </div>
           </div>
 

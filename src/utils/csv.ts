@@ -2,7 +2,6 @@ import { Lead, STATUS_CONFIG } from '../types'
 
 export function exportToCSV(leads: Lead[]): void {
   const headers = [
-    'Household Name',
     'Address',
     'Contact Name',
     'Phone',
@@ -17,7 +16,6 @@ export function exportToCSV(leads: Lead[]): void {
   const escape = (v: string) => `"${v.replace(/"/g, '""')}"`
 
   const rows = leads.map((l) => [
-    escape(l.householdName),
     escape(l.address),
     escape(l.contactName),
     escape(l.phone),

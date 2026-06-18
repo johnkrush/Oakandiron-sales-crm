@@ -3,7 +3,7 @@ import { useApp } from '../../contexts/AppContext'
 import { Lead, LeadStatus, STATUS_CONFIG, ALL_STATUSES } from '../../types'
 import { Search, ChevronUp, ChevronDown, MapPin, Phone } from 'lucide-react'
 
-type SortKey = 'householdName' | 'address' | 'status' | 'assignedRep' | 'updatedAt'
+type SortKey = 'notes' | 'address' | 'status' | 'assignedRep' | 'updatedAt'
 type SortDir = 'asc' | 'desc'
 
 const STATUS_ORDER: Record<LeadStatus, number> = {
@@ -39,7 +39,7 @@ export default function LeadList() {
       const matchFilter = activeFilters.length === 0 || activeFilters.includes(l.status)
       const matchQuery =
         !q ||
-        l.householdName.toLowerCase().includes(q) ||
+        l.notes.toLowerCase().includes(q) ||
         l.address.toLowerCase().includes(q) ||
         l.contactName.toLowerCase().includes(q) ||
         l.assignedRep.toLowerCase().includes(q) ||
@@ -160,9 +160,9 @@ export default function LeadList() {
                 <th
                   className={thClass}
                   style={thStyle}
-                  onClick={() => handleSort('householdName')}
+                  onClick={() => handleSort('notes')}
                 >
-                  <span className="flex items-center gap-1">Household <SortIcon col="householdName" /></span>
+                  <span className="flex items-center gap-1">Notes <SortIcon col="notes" /></span>
                 </th>
                 <th
                   className={`${thClass} hidden md:table-cell`}
@@ -219,8 +219,8 @@ export default function LeadList() {
                 >
                   <td className="px-4 py-3">
                     <div>
-                      <p className="text-sm font-medium text-white group-hover:text-indigo-300 transition-colors">
-                        {lead.householdName}
+                      <p className="text-sm font-medium text-white group-hover:text-indigo-300 transition-colors max-w-[170px] md:max-w-[280px] truncate">
+                        {lead.notes || '—'}
                       </p>
                       {lead.contactName && (
                         <p className="text-xs text-dim mt-0.5">{lead.contactName}</p>

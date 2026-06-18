@@ -279,7 +279,7 @@ export default function Dashboard() {
                 >
                   <span className="w-2 h-2 rounded-full shrink-0" style={{ background: cfg.color }} />
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-white truncate">{lead.householdName}</p>
+                    <p className="text-sm font-medium text-white truncate">{lead.notes || lead.address || '—'}</p>
                     <p className="text-xs text-dim truncate">{lead.assignedRep}</p>
                   </div>
                   <div className="text-right shrink-0">
