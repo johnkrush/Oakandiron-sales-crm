@@ -245,8 +245,8 @@ export default function MapView() {
   }, [userLocation, flyTo, showLocToast])
 
   const handleSearchSelect = useCallback((lat: number, lng: number) => {
-    setMapPosition({ lat, lng, zoom: 15 })
-  }, [setMapPosition])
+    flyTo({ lat, lng, zoom: 16 })
+  }, [flyTo])
 
   const tileConfig = TILES[mapStyle]
   return (

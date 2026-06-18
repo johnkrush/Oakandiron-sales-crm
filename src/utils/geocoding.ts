@@ -1,8 +1,19 @@
 export interface NominatimResult {
-  place_id: number
+  place_id: string
   display_name: string
   lat: string
   lon: string
+}
+
+interface MapboxFeature {
+  properties: {
+    mapbox_id: string
+    name: string
+    full_address?: string
+    place_formatted?: string
+    coordinates: { latitude: number; longitude: number }
+    context?: { region?: { name?: string; region_code?: string } }
+  }
 }
 
 interface NominatimAddress {
@@ -34,13 +45,35 @@ const HEADERS: HeadersInit = {
   'User-Agent': 'OakandIronSales/1.0',
 }
 
+const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN as string
+// Bias results toward the Oakville canvassing area (lng,lat)
+const PROXIMITY = '-79.6877,43.4675'
+
+// Search via Mapbox, restricted to Ontario so reps only see ON places.
 export async function searchPlaces(query: string): Promise<NominatimResult[]> {
   if (!query.trim()) return []
   try {
-    const url = `${BASE}/search?format=json&limit=5&q=${encodeURIComponent(query)}&addressdetails=0`
-    const res = await fetch(url, { headers: HEADERS })
+    const url =
+      `https://api.mapbox.com/search/geocode/v6/forward?q=${encodeURIComponent(query)}` +
+      `&country=ca&proximity=${PROXIMITY}&limit=8&language=en` +
+      `&types=address,street,neighborhood,locality,place,postcode` +
+      `&access_token=${MAPBOX_TOKEN}`
+    const res = await fetch(url)
     if (!res.ok) return []
-    return (await res.json()) as NominatimResult[]
+    const data = await res.json()
+    const features = (data.features ?? []) as MapboxFeature[]
+    return features
+      .filter((f) => {
+        const region = f.properties?.context?.region
+        return region?.region_code === 'ON' || region?.name === 'Ontario'
+      })
+      .slice(0, 5)
+      .map((f) => ({
+        place_id: f.properties.mapbox_id,
+        display_name: f.properties.full_address || f.properties.name,
+        lat: String(f.properties.coordinates.latitude),
+        lon: String(f.properties.coordinates.longitude),
+      }))
   } catch {
     return []
   }
