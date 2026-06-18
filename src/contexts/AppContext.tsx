@@ -42,6 +42,7 @@ import {
   rowToRepCredential,
 } from '../utils/supabase'
 import { DEMO_LEADS } from '../data/demoData'
+import { reportSyncError } from '../utils/toast'
 
 interface FlyToTarget {
   lat: number
@@ -307,10 +308,29 @@ export function AppProvider({ children }: { children: ReactNode }) {
       if (!error && data) {
         setLeads((prev) => {
           const incoming = (data as LeadRow[]).map(rowToLead)
+          const incomingIds = new Set(incoming.map((l) => l.id))
+
+          // Keep any local leads that aren't in Supabase yet — these are
+          // recently-added leads whose insert hasn't landed (or failed).
+          // Without this the poll would silently drop them after 30 s.
+          const unsynced = prev.filter((l) => !incomingIds.has(l.id))
+
+          if (unsynced.length > 0) {
+            // Retry pushing the unsynced leads up to Supabase
+            supabase
+              .from('leads')
+              .upsert(unsynced.map(leadToRow))
+              .then(({ error }) => {
+                if (error) console.error('[supabase] poll resync:', error.message)
+              })
+          }
+
+          const merged = [...incoming, ...unsynced]
+
           // Only update state if something actually changed
-          const prevIds = prev.map((l) => l.id + l.updatedAt).join()
-          const nextIds = incoming.map((l) => l.id + l.updatedAt).join()
-          return prevIds === nextIds ? prev : incoming
+          const prevKey = prev.map((l) => l.id + l.updatedAt).join()
+          const nextKey = merged.map((l) => l.id + l.updatedAt).join()
+          return prevKey === nextKey ? prev : merged
         })
       }
     }, 30_000)
@@ -405,7 +425,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       supabase
         .from('leads')
         .insert(leadToRow(lead))
-        .then(({ error }) => { if (error) console.error('[supabase] addLead:', error.message) })
+        .then(({ error }) => { if (error) reportSyncError('addLead', error.message) })
       return lead
     },
     []
@@ -419,7 +439,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       .from('leads')
       .update({ ...leadToRow(withTs), updated_at: now })
       .eq('id', updated.id)
-      .then(({ error }) => { if (error) console.error('[supabase] updateLead:', error.message) })
+      .then(({ error }) => { if (error) reportSyncError('updateLead', error.message) })
   }, [])
 
   const deleteLead = useCallback((id: string) => {
@@ -428,7 +448,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       .from('leads')
       .delete()
       .eq('id', id)
-      .then(({ error }) => { if (error) console.error('[supabase] deleteLead:', error.message) })
+      .then(({ error }) => { if (error) reportSyncError('deleteLead', error.message) })
   }, [])
 
   // ── Map ───────────────────────────────────────────────────────────
