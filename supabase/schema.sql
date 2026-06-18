@@ -35,6 +35,31 @@ create table if not exists public.team_members (
   created_at timestamptz not null default now()
 );
 
+-- ── Reconcile columns on pre-existing tables ───────────────────────
+-- CREATE TABLE IF NOT EXISTS does nothing if the table already exists,
+-- so a table created earlier with a partial schema would be missing
+-- columns the app writes (this is what caused writes to 400 with
+-- "Could not find the 'assigned_rep' column"). These add any missing
+-- columns and are no-ops where they already exist.
+alter table public.leads add column if not exists household_name text;
+alter table public.leads add column if not exists address        text;
+alter table public.leads add column if not exists contact_name   text;
+alter table public.leads add column if not exists phone          text;
+alter table public.leads add column if not exists email          text;
+alter table public.leads add column if not exists status         text;
+alter table public.leads add column if not exists notes          text;
+alter table public.leads add column if not exists assigned_rep   text;
+alter table public.leads add column if not exists lat            double precision;
+alter table public.leads add column if not exists lng            double precision;
+alter table public.leads add column if not exists created_at     timestamptz default now();
+alter table public.leads add column if not exists updated_at     timestamptz default now();
+
+alter table public.team_members add column if not exists name       text;
+alter table public.team_members add column if not exists email      text;
+alter table public.team_members add column if not exists password   text;
+alter table public.team_members add column if not exists role       text default 'rep';
+alter table public.team_members add column if not exists created_at timestamptz default now();
+
 -- ── Realtime ───────────────────────────────────────────────────────
 -- The app subscribes to postgres_changes on both tables.
 alter publication supabase_realtime add table public.leads;
@@ -56,3 +81,7 @@ drop policy if exists "public read team"  on public.team_members;
 drop policy if exists "public write team" on public.team_members;
 create policy "public read team"  on public.team_members for select using (true);
 create policy "public write team" on public.team_members for all    using (true) with check (true);
+
+-- ── Refresh PostgREST schema cache ─────────────────────────────────
+-- So the API layer immediately picks up any columns added above.
+notify pgrst, 'reload schema';
