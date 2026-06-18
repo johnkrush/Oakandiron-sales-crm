@@ -98,22 +98,6 @@ export const ALL_STATUSES: LeadStatus[] = [
   'do-not-knock',
 ]
 
-export const TEAM_MEMBERS = [
-  'Chris',
-  'Sarah Chen',
-  'Mike Rodriguez',
-  'Lisa Thompson',
-  'David Park',
-  'Tom Wilson',
-  'Emma Davis',
-]
+export const TEAM_MEMBERS: string[] = []
 
-export const DEFAULT_REP_CREDENTIALS: RepCredential[] = [
-  { id: 'rep-0', email: 'chris@canvass.app', password: 'canvass123', name: 'Chris' },
-  { id: 'rep-1', email: 'sarah@canvass.app', password: 'canvass123', name: 'Sarah Chen' },
-  { id: 'rep-2', email: 'mike@canvass.app', password: 'canvass123', name: 'Mike Rodriguez' },
-  { id: 'rep-3', email: 'lisa@canvass.app', password: 'canvass123', name: 'Lisa Thompson' },
-  { id: 'rep-4', email: 'david@canvass.app', password: 'canvass123', name: 'David Park' },
-  { id: 'rep-5', email: 'tom@canvass.app', password: 'canvass123', name: 'Tom Wilson' },
-  { id: 'rep-6', email: 'emma@canvass.app', password: 'canvass123', name: 'Emma Davis' },
-]
+export const DEFAULT_REP_CREDENTIALS: RepCredential[] = []

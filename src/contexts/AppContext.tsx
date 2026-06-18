@@ -102,7 +102,6 @@ interface AppContextValue {
 
 // Owner / admin logins — hardcoded, full admin access. Emails are lowercase.
 const OWNER_ACCOUNTS = [
-  { email: 'admin@canvass.app', password: 'Oakandiron26', name: 'Admin User' },
   { email: 'johnnie.krush@canvass.app', password: 'Bangjob123', name: 'Johnnie Krush' },
   { email: 'chris.araujo@canvass.app', password: 'Bangjob123', name: 'Chris Araujo' },
 ]
