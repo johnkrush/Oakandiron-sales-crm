@@ -8,7 +8,7 @@ export default function FilterBar() {
     leads.filter((l) => l.status === status).length
 
   return (
-    <div className="flex items-center gap-1 md:gap-1.5 flex-wrap justify-center">
+    <div className="flex items-center gap-1 md:gap-1.5 flex-wrap justify-center w-full pl-11 md:pl-0">
       {/* All button */}
       <button
         onClick={clearFilters}

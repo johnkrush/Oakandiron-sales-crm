@@ -177,6 +177,15 @@
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4) !important;
 }
 
+/* On mobile the search + filter bar span the top, so push the top-left
+   zoom control down to clear them. Desktop is unaffected. */
+@media (max-width: 767px) {
+  .leaflet-top.leaflet-left {
+    margin-top: 56px;
+    margin-left: 0;
+  }
+}
+
 .leaflet-control-zoom a {
   background: rgba(12, 18, 35, 0.9) !important;
   backdrop-filter: blur(10px);

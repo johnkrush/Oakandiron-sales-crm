@@ -324,7 +324,7 @@ export default function MapView() {
         <div className="w-full max-w-md pointer-events-auto">
           <SearchBar onSelect={handleSearchSelect} />
         </div>
-        <div className="pointer-events-auto">
+        <div className="pointer-events-auto w-full">
           <FilterBar />
         </div>
       </div>
