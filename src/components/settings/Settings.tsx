@@ -6,7 +6,6 @@ import {
   Users,
   Download,
   Trash2,
-  AlertTriangle,
   CheckCircle,
   Info,
   UserCircle,
@@ -265,7 +264,6 @@ function AddAccountForm({
 export default function SettingsPage() {
   const {
     leads,
-    clearData,
     user,
     isAdmin,
     updateUser,
@@ -342,7 +340,6 @@ export default function SettingsPage() {
   const existingRepNames = new Set(repCredentials.map((c) => c.name))
 
   // ── Data ─────────────────────────────────────────────────────
-  const [confirmClear, setConfirmClear] = useState(false)
   const [exported, setExported] = useState(false)
 
   const handleExport = () => {
@@ -350,13 +347,6 @@ export default function SettingsPage() {
     setExported(true)
     showToast(`Exported ${leads.length} leads to CSV`)
     setTimeout(() => setExported(false), 2500)
-  }
-
-  const handleClear = () => {
-    if (!confirmClear) { setConfirmClear(true); return }
-    clearData()
-    setConfirmClear(false)
-    showToast('Data reset to demo leads')
   }
 
   return (
@@ -557,30 +547,6 @@ export default function SettingsPage() {
             <button onClick={handleExport} className="btn-primary">
               {exported ? <><CheckCircle size={15} />Exported!</> : <><Download size={15} />Export {leads.length} Leads</>}
             </button>
-          </div>
-        </Section>
-
-        {/* ── Danger Zone ───────────────────────────────────── */}
-        <Section title="Danger Zone" icon={Trash2}>
-          <div className="px-5 py-4">
-            <p className="text-sm text-mid mb-1">Reset all lead data</p>
-            <p className="text-xs text-dim mb-4">
-              Deletes all leads and restores the 20 demo leads. Rep accounts and team members are preserved.
-            </p>
-            {confirmClear && (
-              <div className="flex items-start gap-2 px-3 py-2.5 rounded-lg text-sm mb-3"
-                style={{ background: 'rgba(226,75,74,0.12)', border: '1px solid rgba(226,75,74,0.3)', color: '#E24B4A' }}>
-                <AlertTriangle size={14} className="shrink-0 mt-0.5" />
-                Are you sure? All leads will be permanently deleted.
-              </div>
-            )}
-            <div className="flex items-center gap-3">
-              <button onClick={handleClear} className="btn-danger">
-                <Trash2 size={14} />
-                {confirmClear ? 'Yes, Reset Everything' : 'Reset All Data'}
-              </button>
-              {confirmClear && <button onClick={() => setConfirmClear(false)} className="btn-ghost text-sm">Cancel</button>}
-            </div>
           </div>
         </Section>
 
