@@ -2,7 +2,8 @@ import { useState, useEffect, type FormEvent } from 'react'
 import { useApp } from '../../contexts/AppContext'
 import { Lead, LeadStatus, STATUS_CONFIG, ALL_STATUSES } from '../../types'
 import { reverseGeocode } from '../../utils/geocoding'
-import { X, Trash2, Loader2, MapPin } from 'lucide-react'
+import { sendQuoteRequest, crmEnabled } from '../../utils/crm'
+import { X, Trash2, Loader2, MapPin, FileText } from 'lucide-react'
 
 interface Props {
   pendingPin: { lat: number; lng: number } | null
@@ -28,6 +29,8 @@ export default function PinForm({ pendingPin, existingLead, onClose }: Props) {
   const [missingHouseNumber, setMissingHouseNumber] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [quoteState, setQuoteState] = useState<'idle' | 'sending' | 'sent'>('idle')
+  const [quoteErr, setQuoteErr] = useState('')
 
   // Initialize form when editing existing lead
   useEffect(() => {
@@ -87,6 +90,22 @@ export default function PinForm({ pendingPin, existingLead, onClose }: Props) {
     if (!confirmDelete) { setConfirmDelete(true); return }
     deleteLead(existingLead.id)
     onClose()
+  }
+
+  const handleRequestQuote = async () => {
+    if (quoteState === 'sending') return
+    setQuoteState('sending')
+    setQuoteErr('')
+    const res = await sendQuoteRequest({
+      name: form.contactName,
+      phone: form.phone,
+      email: form.email,
+      address: form.address,
+      notes: form.notes,
+      rep: form.assignedRep || user?.name || '',
+    })
+    if (res.ok) setQuoteState('sent')
+    else { setQuoteState('idle'); setQuoteErr(res.error || 'Could not send to CRM') }
   }
 
   const isNew = !existingLead
@@ -274,6 +293,41 @@ export default function PinForm({ pendingPin, existingLead, onClose }: Props) {
                 </div>
               )}
             </div>
+
+            {/* Request a quote — sends this lead into the business CRM */}
+            {crmEnabled && (
+              <div className="pt-1">
+                <button
+                  type="button"
+                  onClick={handleRequestQuote}
+                  disabled={quoteState !== 'idle' || !form.address}
+                  className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-semibold text-white transition-all active:scale-95 disabled:opacity-50"
+                  style={{
+                    background:
+                      quoteState === 'sent'
+                        ? 'rgba(29,158,117,0.85)'
+                        : 'linear-gradient(135deg, #1D9E75, #16845f)',
+                    boxShadow: '0 4px 16px rgba(29,158,117,0.3)',
+                  }}
+                >
+                  {quoteState === 'sending' ? (
+                    <><Loader2 size={14} className="animate-spin" /> Sending…</>
+                  ) : quoteState === 'sent' ? (
+                    <>✓ Quote sent to CRM</>
+                  ) : (
+                    <><FileText size={14} /> Request Quote</>
+                  )}
+                </button>
+                {quoteState === 'sent' && (
+                  <p className="mt-1.5 text-[11px] text-dim">
+                    Added to your business CRM as a new lead.
+                  </p>
+                )}
+                {quoteErr && (
+                  <p className="mt-1.5 text-[11px]" style={{ color: '#E24B4A' }}>{quoteErr}</p>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Actions */}
