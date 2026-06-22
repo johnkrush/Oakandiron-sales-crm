@@ -28,7 +28,7 @@ function StatusBadge({ status }: { status: LeadStatus }) {
 }
 
 export default function LeadList() {
-  const { leads, setCurrentView, flyTo, selectLead, activeFilters, toggleFilter, clearFilters } = useApp()
+  const { leads, setCurrentView, flyTo, selectLead, activeFilters, toggleFilter, clearFilters, user, isAdmin } = useApp()
   const [query, setQuery] = useState('')
   const [sortKey, setSortKey] = useState<SortKey>('updatedAt')
   const [sortDir, setSortDir] = useState<SortDir>('desc')
@@ -36,6 +36,8 @@ export default function LeadList() {
   const filtered = useMemo(() => {
     const q = query.toLowerCase()
     return leads.filter((l) => {
+      // Reps only see their own leads in the list; admins see everyone's.
+      const mine = isAdmin || l.assignedRep === user?.name
       const matchFilter = activeFilters.length === 0 || activeFilters.includes(l.status)
       const matchQuery =
         !q ||
@@ -45,9 +47,9 @@ export default function LeadList() {
         l.assignedRep.toLowerCase().includes(q) ||
         l.phone.includes(q) ||
         STATUS_CONFIG[l.status].label.toLowerCase().includes(q)
-      return matchFilter && matchQuery
+      return mine && matchFilter && matchQuery
     })
-  }, [leads, query, activeFilters])
+  }, [leads, query, activeFilters, isAdmin, user])
 
   const sorted = useMemo(() => {
     return [...filtered].sort((a, b) => {
