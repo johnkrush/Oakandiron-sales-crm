@@ -10,6 +10,7 @@ const KEYS = {
   repCredentials: 'canvass_rep_credentials',
   repCredsInitialized: 'canvass_rep_creds_initialized',
   mapStyle: 'canvass_map_style',
+  pendingLeads: 'canvass_pending_lead_ids',
 } as const
 
 export type MapStyle = 'street' | 'satellite' | 'hybrid'
@@ -110,6 +111,31 @@ export function getTeamMembers(): string[] {
 
 export function saveTeamMembers(members: string[]): void {
   localStorage.setItem(KEYS.teamMembers, JSON.stringify(members))
+}
+
+// ── Pending lead inserts ──────────────────────────────────────────
+// IDs of leads created locally whose Supabase insert hasn't been confirmed yet.
+// Only these may be re-pushed on sync — anything else missing from Supabase was
+// deleted on purpose and must NOT be resurrected.
+export function getPendingLeadIds(): string[] {
+  try {
+    const raw = localStorage.getItem(KEYS.pendingLeads)
+    return raw ? (JSON.parse(raw) as string[]) : []
+  } catch {
+    return []
+  }
+}
+
+export function savePendingLeadIds(ids: string[]): void {
+  localStorage.setItem(KEYS.pendingLeads, JSON.stringify([...new Set(ids)]))
+}
+
+export function addPendingLeadId(id: string): void {
+  savePendingLeadIds([...getPendingLeadIds(), id])
+}
+
+export function removePendingLeadId(id: string): void {
+  savePendingLeadIds(getPendingLeadIds().filter((x) => x !== id))
 }
 
 export function clearAllData(): void {

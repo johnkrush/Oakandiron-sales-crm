@@ -32,6 +32,10 @@ import {
   getRepCredentials,
   saveRepCredentials,
   hasStoredRepCredentials,
+  getPendingLeadIds,
+  savePendingLeadIds,
+  addPendingLeadId,
+  removePendingLeadId,
 } from '../utils/storage'
 import {
   supabase,
@@ -195,28 +199,31 @@ export function AppProvider({ children }: { children: ReactNode }) {
           setLeads(seeded)
           const { error } = await supabase.from('leads').insert(seeded.map(leadToRow))
           if (error) console.error('[supabase] seed leads:', error.message)
-        } else if (leadsData.length === 0 && localLeads.length > 0) {
-          // Supabase is empty but localStorage has leads — previous inserts likely failed.
-          // Keep the local leads and re-sync them to Supabase now.
-          setLeads(localLeads)
-          const { error } = await supabase.from('leads').insert(localLeads.map(leadToRow))
-          if (error) console.error('[supabase] resync local leads:', error.message)
         } else {
-          // Supabase has data — use it as the primary source, but also check for any
-          // locally-stored leads that never made it to Supabase (failed inserts).
+          // Supabase is the source of truth for which leads exist. A local lead that's
+          // missing from Supabase is only re-pushed if it's a genuine pending insert
+          // (created offline, never confirmed). Anything else missing was deleted
+          // elsewhere and must stay deleted — otherwise deletes never stick.
           const supabaseLeads = (leadsData as LeadRow[]).map(rowToLead)
           const supabaseIds = new Set(supabaseLeads.map((l) => l.id))
-          const unsyncedLeads = localLeads.filter((l) => !supabaseIds.has(l.id))
+          const pendingIds = new Set(getPendingLeadIds())
 
-          if (unsyncedLeads.length > 0) {
-            // Try to push the unsynced leads up to Supabase now
+          // Clear pending markers that Supabase has now confirmed.
+          savePendingLeadIds(getPendingLeadIds().filter((id) => !supabaseIds.has(id)))
+
+          const toResync = localLeads.filter(
+            (l) => !supabaseIds.has(l.id) && pendingIds.has(l.id)
+          )
+
+          if (toResync.length > 0) {
             supabase
               .from('leads')
-              .insert(unsyncedLeads.map(leadToRow))
+              .insert(toResync.map(leadToRow))
               .then(({ error }) => {
-                if (error) console.error('[supabase] sync unsynced leads:', error.message)
+                if (error) console.error('[supabase] sync pending leads:', error.message)
+                else toResync.forEach((l) => removePendingLeadId(l.id))
               })
-            setLeads([...supabaseLeads, ...unsyncedLeads])
+            setLeads([...supabaseLeads, ...toResync])
           } else {
             setLeads(supabaseLeads)
           }
@@ -316,18 +323,20 @@ export function AppProvider({ children }: { children: ReactNode }) {
           const incoming = (data as LeadRow[]).map(rowToLead)
           const incomingIds = new Set(incoming.map((l) => l.id))
 
-          // Keep any local leads that aren't in Supabase yet — these are
-          // recently-added leads whose insert hasn't landed (or failed).
-          // Without this the poll would silently drop them after 30 s.
-          const unsynced = prev.filter((l) => !incomingIds.has(l.id))
+          // Keep only genuinely-pending local leads that haven't landed yet (created
+          // offline / insert in flight). A lead missing from Supabase that isn't
+          // pending was deleted elsewhere — let the poll drop it so the delete sticks.
+          const pendingIds = new Set(getPendingLeadIds())
+          const unsynced = prev.filter((l) => !incomingIds.has(l.id) && pendingIds.has(l.id))
 
           if (unsynced.length > 0) {
-            // Retry pushing the unsynced leads up to Supabase
+            // Retry pushing the still-pending leads up to Supabase
             supabase
               .from('leads')
               .upsert(unsynced.map(leadToRow))
               .then(({ error }) => {
                 if (error) console.error('[supabase] poll resync:', error.message)
+                else unsynced.forEach((l) => removePendingLeadId(l.id))
               })
           }
 
@@ -431,10 +440,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const now = new Date().toISOString()
       const lead: Lead = { ...data, id: crypto.randomUUID(), createdAt: now, updatedAt: now }
       setLeads((prev) => [...prev, lead])
+      // Mark as pending until Supabase confirms the insert; clear it on success.
+      // This is what lets a real delete stick: only pending leads are ever re-pushed.
+      addPendingLeadId(lead.id)
       supabase
         .from('leads')
         .insert(leadToRow(lead))
-        .then(({ error }) => { if (error) reportSyncError('addLead', error.message) })
+        .then(({ error }) => {
+          if (error) reportSyncError('addLead', error.message)
+          else removePendingLeadId(lead.id)
+        })
       return lead
     },
     []
@@ -453,6 +468,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const deleteLead = useCallback((id: string) => {
     setLeads((prev) => prev.filter((l) => l.id !== id))
+    removePendingLeadId(id) // never resurrect a lead we've explicitly deleted
     supabase
       .from('leads')
       .delete()
