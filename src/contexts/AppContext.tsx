@@ -469,6 +469,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const deleteLead = useCallback((id: string) => {
     setLeads((prev) => prev.filter((l) => l.id !== id))
     removePendingLeadId(id) // never resurrect a lead we've explicitly deleted
+    // Tombstone the id so it can't be re-created by any device's stale local copy.
+    // A DB trigger (see supabase/schema.sql) blocks inserting a tombstoned id.
+    supabase
+      .from('deleted_leads')
+      .upsert({ id })
+      .then(({ error }) => { if (error) console.error('[supabase] tombstone:', error.message) })
     supabase
       .from('leads')
       .delete()

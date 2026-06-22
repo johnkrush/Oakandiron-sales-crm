@@ -99,6 +99,39 @@ drop policy if exists "public write team" on public.team_members;
 create policy "public read team"  on public.team_members for select using (true);
 create policy "public write team" on public.team_members for all    using (true) with check (true);
 
+-- ── Deleted-lead tombstones ────────────────────────────────────────
+-- A deleted lead used to "come back": any device still holding it in its
+-- local cache would re-insert it on sync. This tombstone table + trigger
+-- make a delete permanent at the DB level — once an id is here, the lead
+-- can never be re-created, no matter what (stale) client tries.
+create table if not exists public.deleted_leads (
+  id         uuid primary key,
+  deleted_at timestamptz not null default now()
+);
+
+alter table public.deleted_leads enable row level security;
+drop policy if exists "public write deleted_leads" on public.deleted_leads;
+create policy "public write deleted_leads" on public.deleted_leads
+  for all using (true) with check (true);
+
+-- Block re-inserting any lead whose id has been tombstoned. Returning NULL
+-- from a BEFORE INSERT trigger silently skips that row, so a stale client's
+-- re-insert simply does nothing instead of resurrecting the lead.
+create or replace function public.block_deleted_lead_insert()
+returns trigger language plpgsql as $$
+begin
+  if exists (select 1 from public.deleted_leads d where d.id = NEW.id) then
+    return null;
+  end if;
+  return NEW;
+end;
+$$;
+
+drop trigger if exists trg_block_deleted_lead_insert on public.leads;
+create trigger trg_block_deleted_lead_insert
+  before insert on public.leads
+  for each row execute function public.block_deleted_lead_insert();
+
 -- ── Refresh PostgREST schema cache ─────────────────────────────────
 -- So the API layer immediately picks up any columns added above.
 notify pgrst, 'reload schema';
