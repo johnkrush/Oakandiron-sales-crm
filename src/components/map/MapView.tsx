@@ -8,7 +8,7 @@ import SearchBar from './SearchBar'
 import FilterBar from './FilterBar'
 import AreaSummary from './AreaSummary'
 import PinForm from './PinForm'
-import { Locate, Plus, Layers } from 'lucide-react'
+import { Locate, Layers } from 'lucide-react'
 
 // ── Mapbox tile configs ───────────────────────────────────────────
 const MB_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN as string
@@ -415,19 +415,6 @@ export default function MapView() {
 
       {/* ── FAB controls (bottom-right) ── */}
       <div className="absolute bottom-6 right-4 z-[1000] flex flex-col gap-2">
-        <button
-          onClick={() => handleMapClick(mapPosition.lat, mapPosition.lng)}
-          title="Add a lead at the center of the map"
-          aria-label="Add a lead here"
-          className="w-14 h-14 rounded-2xl flex items-center justify-center shadow-lg transition-all active:scale-95"
-          style={{
-            background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
-            boxShadow: '0 4px 20px rgba(99,102,241,0.45)',
-          }}
-        >
-          <Plus size={24} className="text-white" />
-        </button>
-
         <button
           onClick={handleLocate}
           title="My location"
