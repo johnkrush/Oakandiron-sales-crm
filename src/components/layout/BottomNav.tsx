@@ -25,7 +25,8 @@ export default function BottomNav() {
     <nav
       className="md:hidden flex items-center shrink-0 z-30"
       style={{
-        height: '64px',
+        height: 'calc(64px + env(safe-area-inset-bottom))',
+        paddingBottom: 'env(safe-area-inset-bottom)',
         background: 'rgba(8,11,18,0.92)',
         backdropFilter: 'blur(20px)',
         borderTop: '1px solid rgba(255,255,255,0.08)',

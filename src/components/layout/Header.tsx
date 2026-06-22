@@ -6,8 +6,10 @@ export default function Header() {
 
   return (
     <header
-      className="shrink-0 flex items-center justify-between px-4 h-14 z-30"
+      className="shrink-0 flex items-center justify-between px-4 z-30"
       style={{
+        height: 'calc(3.5rem + env(safe-area-inset-top))',
+        paddingTop: 'env(safe-area-inset-top)',
         background: 'rgba(8,11,18,0.85)',
         backdropFilter: 'blur(20px)',
         borderBottom: '1px solid rgba(255,255,255,0.07)',

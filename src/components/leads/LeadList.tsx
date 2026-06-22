@@ -151,7 +151,49 @@ export default function LeadList() {
             <p className="text-white/30 text-sm">No leads match your filters</p>
           </div>
         ) : (
-          <table className="w-full border-collapse min-w-[640px]">
+          <>
+          {/* Mobile: tappable card list (no sideways scrolling) */}
+          <div className="md:hidden" style={{ borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+            {sorted.map((lead) => (
+              <div
+                key={lead.id}
+                onClick={() => handleRowClick(lead)}
+                className="px-4 py-3 flex flex-col gap-2 cursor-pointer active:bg-white/5 transition-colors"
+                style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium text-white truncate">{lead.notes || lead.address || '—'}</p>
+                    <p className="text-xs text-dim truncate mt-0.5 flex items-center gap-1">
+                      <MapPin size={11} className="shrink-0" />
+                      {lead.address || '—'}
+                    </p>
+                  </div>
+                  <StatusBadge status={lead.status} />
+                </div>
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-xs text-dim truncate">{lead.assignedRep || '—'}</span>
+                  <div className="flex items-center gap-3 shrink-0">
+                    {lead.phone && (
+                      <a
+                        href={`tel:${lead.phone}`}
+                        onClick={(e) => e.stopPropagation()}
+                        className="flex items-center gap-1 text-xs font-medium text-indigo-300"
+                      >
+                        <Phone size={12} /> Call
+                      </a>
+                    )}
+                    <span className="text-xs text-dim">
+                      {new Date(lead.updatedAt).toLocaleDateString('en-CA', { month: 'short', day: 'numeric' })}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Desktop: table */}
+          <table className="hidden md:table w-full border-collapse min-w-[640px]">
             <thead
               className="sticky top-0 z-10"
               style={{ background: 'rgba(8,11,18,0.9)', backdropFilter: 'blur(12px)', borderBottom: '1px solid rgba(255,255,255,0.07)' }}
@@ -262,6 +304,7 @@ export default function LeadList() {
               ))}
             </tbody>
           </table>
+          </>
         )}
       </div>
     </div>
