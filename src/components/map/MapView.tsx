@@ -1,9 +1,9 @@
-import { useState, useCallback, useEffect, useRef } from 'react'
+import { useState, useCallback, useEffect, useRef, useMemo } from 'react'
 import { MapContainer, TileLayer, Marker, CircleMarker, useMap, useMapEvents } from 'react-leaflet'
 import L, { type LatLngBounds } from 'leaflet'
 import { useApp } from '../../contexts/AppContext'
 import { Lead, STATUS_CONFIG } from '../../types'
-import { saveMapPosition, getMapStyle, saveMapStyle, type MapStyle } from '../../utils/storage'
+import { saveMapPosition, getMapPosition, getMapStyle, saveMapStyle, type MapStyle } from '../../utils/storage'
 import SearchBar from './SearchBar'
 import FilterBar from './FilterBar'
 import AreaSummary from './AreaSummary'
@@ -53,6 +53,20 @@ function createTeardropIcon(color: string, selected = false) {
     iconAnchor: [w / 2, h],
     popupAnchor: [0, -h],
   })
+}
+
+// Reuse one divIcon per (color, selected) combo. Without this, every map
+// re-render rebuilds a brand-new SVG icon for all pins, forcing Leaflet to
+// tear down and recreate every marker's DOM node — the main source of jank.
+const iconCache = new Map<string, L.DivIcon>()
+function getTeardropIcon(color: string, selected: boolean) {
+  const key = `${color}|${selected}`
+  let icon = iconCache.get(key)
+  if (!icon) {
+    icon = createTeardropIcon(color, selected)
+    iconCache.set(key, icon)
+  }
+  return icon
 }
 
 // ── Pulsing blue location dot ─────────────────────────────────────
@@ -112,8 +126,6 @@ export default function MapView() {
     isAdmin,
     canEditLead,
     updateLead,
-    mapPosition,
-    setMapPosition,
     flyToTarget,
     flyTo,
     clearFlyTo,
@@ -123,6 +135,9 @@ export default function MapView() {
   } = useApp()
 
   const [mapStyle, setMapStyleState] = useState<MapStyle>(() => getMapStyle())
+  // Map's starting view — read once from storage. The map is uncontrolled
+  // after mount, so this never needs to live in React state or context.
+  const [initialPos] = useState(getMapPosition)
   const [bounds, setBounds] = useState<LatLngBounds | null>(null)
   const [pendingPin, setPendingPin] = useState<{ lat: number; lng: number } | null>(null)
   const [clickHighlight, setClickHighlight] = useState<{ lat: number; lng: number } | null>(null)
@@ -187,9 +202,23 @@ export default function MapView() {
     }
   }, [flyToTarget, leads])
 
-  const visibleLeads = activeFilters.length === 0
-    ? leads
-    : leads.filter((l) => activeFilters.includes(l.status))
+  // Apply status filters once...
+  const filteredLeads = useMemo(
+    () =>
+      activeFilters.length === 0
+        ? leads
+        : leads.filter((l) => activeFilters.includes(l.status)),
+    [leads, activeFilters]
+  )
+
+  // ...then only render pins inside the current viewport (padded a little so
+  // panning stays seamless). This caps the live marker count regardless of how
+  // many leads exist in total — the main win as the dataset keeps growing.
+  const visibleLeads = useMemo(() => {
+    if (!bounds) return filteredLeads
+    const padded = bounds.pad(0.5)
+    return filteredLeads.filter((l) => padded.contains([l.lat, l.lng]))
+  }, [filteredLeads, bounds])
 
   const handleMapClick = useCallback((lat: number, lng: number) => {
     if (showForm) return
@@ -230,9 +259,12 @@ export default function MapView() {
 
   const handleBoundsChange = useCallback((b: LatLngBounds) => setBounds(b), [])
 
+  // Persist position to storage only. It deliberately does NOT go through
+  // context/state — the map is uncontrolled, so a state write here would
+  // re-render the whole map (and rebuild every pin) on each pan/zoom.
   const handlePositionChange = useCallback((lat: number, lng: number, zoom: number) => {
-    setMapPosition({ lat, lng, zoom }); saveMapPosition({ lat, lng, zoom })
-  }, [setMapPosition])
+    saveMapPosition({ lat, lng, zoom })
+  }, [])
 
   const handleLocate = useCallback(() => {
     if (userLocation) { flyTo({ lat: userLocation.lat, lng: userLocation.lng, zoom: 17 }); return }
@@ -251,8 +283,8 @@ export default function MapView() {
   return (
     <div className="relative w-full flex-1 overflow-hidden">
       <MapContainer
-        center={[mapPosition.lat, mapPosition.lng]}
-        zoom={mapPosition.zoom}
+        center={[initialPos.lat, initialPos.lng]}
+        zoom={initialPos.zoom}
         minZoom={10}
         maxZoom={22}
         style={{ width: '100%', height: '100%' }}
@@ -300,7 +332,7 @@ export default function MapView() {
               key={lead.id}
               position={[lead.lat, lead.lng]}
               draggable={editable}
-              icon={createTeardropIcon(
+              icon={getTeardropIcon(
                 editable ? STATUS_CONFIG[lead.status].color : STATUS_CONFIG[lead.status].color + '88',
                 editLead?.id === lead.id
               )}
@@ -338,7 +370,7 @@ export default function MapView() {
 
       {/* ── Area summary (top-right, below filter bar) ── */}
       <div className="absolute right-3 z-[1000] pointer-events-none top-[126px] md:top-[150px]">
-        <AreaSummary leads={visibleLeads} bounds={bounds} />
+        <AreaSummary leads={filteredLeads} bounds={bounds} />
       </div>
 
       {/* ── Map style toggle + rep badge (bottom-left) ── */}
