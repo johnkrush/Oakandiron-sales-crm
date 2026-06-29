@@ -46,11 +46,11 @@ export default function PinForm({ pendingPin, existingLead, onClose }: Props) {
         assignedRep: existingLead.assignedRep,
       })
     } else {
-      // Reps always get self-assigned; admin defaults to first team member
-      const defaultRep = !isAdmin && user ? user.name : (teamMembers[0] ?? '')
+      // New leads default to whoever is logged in (admins included)
+      const defaultRep = user ? user.name : (teamMembers[0] ?? '')
       setForm({ ...BASE_EMPTY, assignedRep: defaultRep })
     }
-  }, [existingLead, isAdmin, user, teamMembers])
+  }, [existingLead, user, teamMembers])
 
   // Reverse geocode when a new pin is dropped
   useEffect(() => {
