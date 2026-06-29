@@ -8,7 +8,7 @@ import SearchBar from './SearchBar'
 import FilterBar from './FilterBar'
 import AreaSummary from './AreaSummary'
 import PinForm from './PinForm'
-import { Locate, Layers } from 'lucide-react'
+import { Locate, Layers, Move, Lock } from 'lucide-react'
 
 // ── Mapbox tile configs ───────────────────────────────────────────
 const MB_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN as string
@@ -146,6 +146,9 @@ export default function MapView() {
   const [showForm, setShowForm] = useState(false)
   const [lockedLead, setLockedLead] = useState<Lead | null>(null)
   const [showStylePicker, setShowStylePicker] = useState(false)
+  // Admin-only: pins can only be dragged when edit mode is on. Off by default
+  // so nobody (reps or admins) accidentally moves a pin.
+  const [editMode, setEditMode] = useState(false)
 
   const handleSetMapStyle = useCallback((style: MapStyle) => {
     setMapStyleState(style)
@@ -331,7 +334,7 @@ export default function MapView() {
             <Marker
               key={lead.id}
               position={[lead.lat, lead.lng]}
-              draggable={editable}
+              draggable={isAdmin && editMode && editable}
               icon={getTeardropIcon(
                 editable ? STATUS_CONFIG[lead.status].color : STATUS_CONFIG[lead.status].color + '88',
                 editLead?.id === lead.id
@@ -447,6 +450,26 @@ export default function MapView() {
 
       {/* ── FAB controls (bottom-right) ── */}
       <div className="absolute bottom-6 right-4 z-[1000] flex flex-col gap-2">
+        {/* Admin-only: toggle pin-drag edit mode. Reps never see this. */}
+        {isAdmin && (
+          <button
+            onClick={() => setEditMode((v) => !v)}
+            title={editMode ? 'Editing pins — tap to lock' : 'Edit pin positions'}
+            className="w-11 h-11 rounded-xl flex items-center justify-center transition-all active:scale-95"
+            style={{
+              background: editMode ? 'rgba(99,102,241,0.25)' : 'rgba(10,14,28,0.9)',
+              backdropFilter: 'blur(12px)',
+              border: `1px solid ${editMode ? 'rgba(99,102,241,0.6)' : 'rgba(255,255,255,0.12)'}`,
+              boxShadow: '0 4px 20px rgba(0,0,0,0.4)',
+            }}
+          >
+            {editMode ? (
+              <Move size={18} style={{ color: '#c7d2fe' }} />
+            ) : (
+              <Lock size={18} style={{ color: 'rgba(240,244,255,0.7)' }} />
+            )}
+          </button>
+        )}
         <button
           onClick={handleLocate}
           title="My location"
